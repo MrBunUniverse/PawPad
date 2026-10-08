@@ -145,7 +145,9 @@ wss.on('connection', (ws) => {
                 type: 'look', style: m.style, coat: m.coat, tone: m.tone === 'midnight' ? 'midnight' : 'default',
                 layout: m.layout === 'wide' ? 'wide' : 'normal', pad: m.pad !== false,
                 controller: ['ps', 'xbox'].includes(m.controller) ? m.controller : 'auto', // look of the pad: PlayStation / Xbox / follow the connected pad
-                source: ['ps4', 'local'].includes(m.source) ? m.source : 'auto'            // which input to show
+                source: ['ps4', 'local'].includes(m.source) ? m.source : 'auto',           // which input to show
+                shadow: Math.min(100, Math.max(0, Math.round(Number(m.shadow) || 0))),     // drop shadow strength, 0 = off
+                fps: Math.min(60, Math.max(5, Math.round(Number(m.fps) || 60)))            // overlay frame-rate cap, 5-60
             };
             broadcast(look);
             sources.refresh();

@@ -35,7 +35,7 @@
     on: '#fcd000', onHi: '#ffffff', onLo: '#fcb000',      // "pressed" colours of bumpers, pills, d-pad arms
     tri: '#43b047', cir: '#ff4d6d', crs: '#2e8bff', sqr: '#ff5fc4', yel: '#fcd000', // face button colours
     m1: '#43b047', m2: '#fcd000', m3: '#e52521',          // L2/R2 meter: low / mid / high
-    pad: null, padHi: null, padLo: null, eye: '#b58b4c', blush: '#f2a39a', earIn: '#f0c4b8'
+    pad: null, padHi: null, padLo: null, blush: '#f2a39a', earIn: '#f0c4b8'
   };
   const BASE = { ...C };
   // Cat preset coats: body = gray parts of the pad; cap = stick cap (defaults to body); bean = paw pads.
@@ -53,7 +53,7 @@
     on: '#f0907a', onHi: '#ffd6ca', onLo: '#c9654f', brown: '#a85a4e',
     tri: '#4fae7b', cir: '#e0606e', crs: '#5a8fd8', sqr: '#e873ae', yel: '#e8b84a',
     m1: '#7fbf8a', m2: '#f2c75c', m3: '#d9645a',
-    pad: '#e0907e', padHi: '#f2b5a6', padLo: '#b8665a', eye: '#b58b4c', blush: '#f2a39a', earIn: '#f0c4b8'
+    pad: '#e0907e', padHi: '#f2b5a6', padLo: '#b8665a', blush: '#f2a39a', earIn: '#f0c4b8'
   };
 
   const SPRITES = {
@@ -89,7 +89,6 @@
     '####..............####', '####..##########..####', '.##..############..##.', '...################...',
     '..##################..', '...################...', '....##############....', '......##########......'
   ];
-  const EAR = ['....##....', '...####...', '...####...', '..######..', '..######..', '.########.', '.########.', '##########'];
 
   // Bunny paw on the stick cap (0.5 grid): four small round toes and a soft round pad; flattened and spread when pressed.
   const BUN_PAW = [
@@ -133,15 +132,14 @@
   const EAR_SMALL = makeEar([-0.5, -5.5], [-4, -3], 1.9, 1.3);
   // Xbox cat: two tilted triangle ears that rise out from behind the round Guide button (it is drawn on top of
   // their bases), so they wrap around its upper corners instead of floating beside it. Left ear shown; the right one mirrors it.
-  const CAT_EAR_X = (() => {
+  const catEarShape = (outer, inner) => {
     const S = 0.5, cells = new Map();
     const inTri = (px, py, a, b, c) => {
       const d = (p, q, r) => (p[0] - r[0]) * (q[1] - r[1]) - (q[0] - r[0]) * (p[1] - r[1]);
       const d1 = d([px, py], a, b), d2 = d([px, py], b, c), d3 = d([px, py], c, a);
       return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
     };
-    const outer = [[-2.8, 0.5], [2.4, 0.5], [-3.4, -4.6]], inner = [[-1.5, 0], [1.2, 0], [-2.5, -3.2]];
-    for (let y = -6; y <= 1; y += S) for (let x = -5; x <= 4; x += S) {
+    for (let y = -8; y <= 1; y += S) for (let x = -6; x <= 4; x += S) {
       if (!inTri(x + S / 2, y + S / 2, ...outer)) continue;
       cells.set(x + ',' + y, inTri(x + S / 2, y + S / 2, ...inner) ? 'in' : 'fur');
     }
@@ -152,7 +150,19 @@
       if (!cells.has(k)) outline.add(k);
     }
     return { list, outline: [...outline].map(k => k.split(',').map(Number)) };
-  })();
+  };
+  const CAT_EAR_X = catEarShape([[-2.8, 0.5], [2.4, 0.5], [-3.7, -5]], [[-2.6, 0], [-0.6, 0], [-3.2, -3.6]]);
+  // PlayStation: bigger, rounder ears; the pad is 14 units tall, so they stand clear of it.
+  const CAT_EAR_PS = catEarShape([[-3.6, 0.5], [3.0, 0.5], [-5, -7]], [[-3.2, 0], [-0.6, 0], [-4.2, -5.2]]);
+  // PlayStation, touchpad pressed: the same ears, shorter and bent down and out.
+  const CAT_EAR_PS_DOWN = catEarShape([[-3.6, 0.5], [3.0, 0.5], [-5.6, -3.5]], [[-3.2, 0], [-0.6, 0], [-4.6, -2.8]]);
+
+  // Cat ears: anchors [x, mirror] on row y. The Xbox Guide uses CAT_EAR_X; the PlayStation pad passes its own shape.
+  const catEars = (anchors, y, shape = CAT_EAR_X) => anchors.forEach(([ax, m]) => {
+    const at = (x, yy, c) => { ctx.fillStyle = c; ctx.fillRect(ax + (m < 0 ? -x - P : x), y + yy, P, P); };
+    shape.outline.forEach(([x, yy]) => at(x, yy, C.ink));
+    shape.list.forEach(([x, yy, v]) => at(x, yy, v === 'in' ? C.bean : C.gray));
+  });
 
   // Touchpad press (finger down or button click): the ears pop up and settle in a few stepped frames.
   // Very small on purpose (a pixel or two): pushing down squashes the ears a hair, letting go pops them back up a hair.
@@ -399,24 +409,12 @@
     if (showPad) at('pad', () => {
       if (xbox) {
         if (bun) ears(33, 4);
-        if (cat) {
-          [[76.5, 1], [83.5, -1]].forEach(([ax, m]) => { // anchors sit inside the button's outline; the button covers the bases
-            const at = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(ax + (m < 0 ? -x - P : x), 35 + y, P, P); };
-            CAT_EAR_X.outline.forEach(([x, y]) => at(x, y, C.ink));
-            CAT_EAR_X.list.forEach(([x, y, v]) => at(x, y, v === 'in' ? C.bean : C.gray));
-          });
-        }
+        if (cat) catEars([[77.5, 1], [82.5, -1]], 36.5); // anchors sit inside the button's outline; the button covers the bases
         guide(b.touchpad);
         return;
       }
       if (bun) ears(by); // ears stay attached to the pad: they rise with it and boing on top
-      if (cat) { // ears behind the touchpad, outlined in ink
-        [69, 91].forEach(ex => {
-          [[-P, 0], [P, 0], [0, -P], [0, P]].forEach(([dx, dy]) => sprite(EAR, ex + dx, by - 1.5 + dy, C.ink, true));
-          sprite(EAR, ex, by - 1.5, C.gray, true);
-          sprite(['##', '##', '##'], ex, by - 0.75, C.bean, true);
-        });
-      }
+      if (cat) catEars([[70, 1], [90, -1]], by + 0.5, b.touchpad ? CAT_EAR_PS_DOWN : CAT_EAR_PS); // ears behind the touchpad: its top edge covers their bases
       if (bun) box(64, by, 32, 14, b.touchpad ? C.padLo : C.pad, b.touchpad ? C.pad : C.padHi, C.padLo);
       else if (themed) box(64, by, 32, 14, b.touchpad ? C.grayLo : C.grayHi, b.touchpad ? C.gray : C.white, C.grayLo);
       else box(64, by, 32, 14, b.touchpad ? C.brown : C.gold, b.touchpad ? C.brown : C.yellow, C.brown);

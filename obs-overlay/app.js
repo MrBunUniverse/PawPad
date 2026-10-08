@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const config = { delayMs: 0, deadzone: 0.06, deviceKind: null };
+  const config = { delayMs: 0, deadzone: 0.06, deviceKind: null, shadow: 0, fps: 60 };
   const stateQueue = []; // FIFO buffer that delays input to match capture-card lag
 
   const $ = (id) => document.getElementById(id);
@@ -27,6 +27,11 @@
   const padLabel = $('padLabel');
   const controllerInput = $('controllerInput');
   const sourceInput = $('sourceInput');
+  const shadowInput = $('shadowInput');
+  const shadowVal = $('shadowVal');
+  const stageCanvas = $('retroCanvas');
+  const fpsInput = $('fpsInput');
+  const fpsVal = $('fpsVal');
 
   // Segmented buttons mirror each <select data-seg>: the select stays the source of truth.
   const COAT_DOT = { pumpkin: '#d9822b', shadow: '#2b2b33', snowball: '#e6e6ee', smokey: '#7d8794', mittens: '#e3d2b2' };
@@ -73,7 +78,7 @@
   // Controller type 'auto' follows the connected pad (PlayStation pads and "no pad" -> PlayStation look, anything else -> Xbox look).
   const effectiveController = () => (config.controller !== 'auto' ? config.controller : ['playstation', null].includes(config.deviceKind) ? 'ps' : 'xbox');
   function applyLook(patch) {
-    const l = { style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source, ...patch };
+    const l = { style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source, shadow: config.shadow, fps: config.fps, ...patch };
     config.style = ['fine', 'bun', 'cat'].includes(l.style) ? l.style : 'classic';
     config.coat = [...coatInput.options].some(o => o.value === l.coat) ? l.coat : config.coat || 'pumpkin';
     config.tone = l.tone === 'midnight' ? 'midnight' : 'default';
@@ -81,6 +86,8 @@
     config.pad = l.pad !== false && l.pad !== 'false' && l.pad !== '0';
     config.controller = ['ps', 'xbox'].includes(l.controller) ? l.controller : 'auto';
     config.source = ['ps4', 'local'].includes(l.source) ? l.source : 'auto'; // bridge-side: which input to show
+    setShadow(Math.min(100, Math.max(0, Math.round(Number(l.shadow) || 0))));
+    setFps(Math.min(60, Math.max(5, Math.round(Number(l.fps) || 60))));
     const ctrl = effectiveController();
     styleInput.value = config.style; coatInput.value = config.coat; toneInput.value = config.tone;
     layoutInput.value = config.layout; controllerInput.value = config.controller; sourceInput.value = config.source; padToggle.checked = config.pad;
@@ -89,13 +96,28 @@
     padLabel.textContent = ctrl === 'xbox' ? 'Guide button' : 'Touchpad';
     syncSegs();
     window.RetroPad.setStyle(config.style, config.coat, config.tone, config.layout, config.pad, ctrl);
-    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source']) localStorage.setItem('pad' + k[0].toUpperCase() + k.slice(1), config[k]); } catch (e) { /* storage blocked */ }
+    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source', 'shadow', 'fps']) localStorage.setItem('pad' + k[0].toUpperCase() + k.slice(1), config[k]); } catch (e) { /* storage blocked */ }
   }
 
   function setDeadzone(fraction) {
     config.deadzone = fraction;
     deadzoneInput.value = Math.round(fraction * 100);
     deadzoneVal.textContent = `${Math.round(fraction * 100)}%`;
+  }
+
+  // Shadow behind the controller, for busy game backgrounds: a CSS drop shadow on the canvas. 0 = off.
+  function setShadow(pct) {
+    config.shadow = pct;
+    shadowInput.value = pct;
+    shadowVal.textContent = pct ? `${pct}%` : 'Off';
+    stageCanvas.style.filter = pct ? `drop-shadow(0 4px ${6 + pct / 25}px rgba(0,0,0,${pct / 100}))` : ''; // blur widens 6px -> 10px at max
+  }
+
+  // Frame-rate cap for the overlay, 5 to 60 fps: fewer redraws (less CPU) or a choppy, stylised look.
+  function setFps(fps) {
+    config.fps = fps;
+    fpsInput.value = fps;
+    fpsVal.textContent = `${fps} fps`;
   }
 
   // URL params: hideUI=1 (or obs), delay=0..500, deadzone=0..0.5, layout=normal|wide, touchpad=0, controller=auto|ps|xbox, preset=classic|fine|bun|fine-midnight|pumpkin|shadow|snowball|smokey|mittens, style=classic|fine|bun|cat, cat=pumpkin|shadow|snowball|smokey|mittens, demo=1 (or sim=1).
@@ -115,7 +137,7 @@
     setDelay(config.delayMs);
     setDeadzone(config.deadzone);
     const saved = {};
-    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source']) saved[k] = localStorage.getItem('pad' + k[0].toUpperCase() + k.slice(1)); } catch (e) { /* storage blocked */ }
+    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source', 'shadow', 'fps']) saved[k] = localStorage.getItem('pad' + k[0].toUpperCase() + k.slice(1)); } catch (e) { /* storage blocked */ }
     // ?preset=pumpkin (or classic / fine / bun) is a one-word shortcut; ?style= / ?cat= still work. Any of them pins this page.
     const preset = params.get('preset');
     const isCoat = (p) => [...coatInput.options].some(o => o.value === p);
@@ -130,7 +152,9 @@
       layout: urlLayout || saved.layout,
       pad: urlPad !== null ? urlPad : saved.pad,
       controller: urlController || saved.controller,
-      source: saved.source
+      source: saved.source,
+      shadow: saved.shadow,
+      fps: saved.fps
     });
   }
 
@@ -141,10 +165,14 @@
   const bind = (el, key) => el.addEventListener('change', () => { applyLook({ [key]: el === padToggle ? el.checked : el.value }); sendLook(); });
   [[styleInput, 'style'], [coatInput, 'coat'], [toneInput, 'tone'], [layoutInput, 'layout'], [padToggle, 'pad'], [controllerInput, 'controller'], [sourceInput, 'source']].forEach(([el, key]) => bind(el, key));
   deadzoneInput.addEventListener('input', (e) => setDeadzone(parseInt(e.target.value, 10) / 100));
+  shadowInput.addEventListener('input', (e) => applyLook({ shadow: e.target.value })); // live preview while dragging
+  shadowInput.addEventListener('change', () => sendLook()); // send once on release, so OBS follows
+  fpsInput.addEventListener('input', (e) => applyLook({ fps: e.target.value }));
+  fpsInput.addEventListener('change', () => sendLook());
   // Test mode runs on the bridge so every client (including OBS) receives it.
   // The chosen look lives on the bridge, so every page (OBS included) follows it with no URL changes.
   const sendLook = () => {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'look', style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source }));
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'look', style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source, shadow: config.shadow, fps: config.fps }));
   };
   const sendSim = () => {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'sim', on: simulatorToggle.checked }));
@@ -168,11 +196,16 @@
     );
   }
 
+  let lastFrame = 0;
   function animationLoop() {
     const now = performance.now();
-    let due = null; // several states can arrive per frame: only the newest one is worth drawing
-    while (stateQueue.length && now - stateQueue[0].localTime >= config.delayMs) due = stateQueue.shift().state;
-    if (due) renderState(due);
+    // Frame-rate cap (the 2 ms slack absorbs vsync jitter). Skipped frames leave their states queued, so the newest one is still drawn.
+    if (now - lastFrame >= 1000 / config.fps - 2) {
+      lastFrame = now;
+      let due = null; // several states can arrive per frame: only the newest one is worth drawing
+      while (stateQueue.length && now - stateQueue[0].localTime >= config.delayMs) due = stateQueue.shift().state;
+      if (due) renderState(due);
+    }
     requestAnimationFrame(animationLoop);
   }
 
