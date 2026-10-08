@@ -129,6 +129,8 @@
   const EAR_NORMAL = makeEar([-2, -12], [-11, -3], 3.1, 2.2);
   // Wide layout: the sticks sit right beside the pad, so the ears are shorter and droop less (no overlap, no clipping).
   const EAR_WIDE = makeEar([-0.5, -9], [-4.5, -4.5], 3.0, 2.1);
+  // Xbox: the Guide button is small (a round head, not a wide pad), so the ears are small too.
+  const EAR_SMALL = makeEar([-0.5, -5.5], [-4, -3], 1.9, 1.3);
   // Touchpad press (finger down or button click): the ears pop up and settle in a few stepped frames.
   // Very small on purpose (a pixel or two): pushing down squashes the ears a hair, letting go pops them back up a hair.
   const BOING_DOWN = [0.95, 0.98, 1];      // vertical ear scale per frame
@@ -155,7 +157,7 @@
         const top = Math.round(y * sy / P) * P, bottom = Math.round((y + P) * sy / P) * P;
         ctx.fillStyle = c; ctx.fillRect(bx + (m < 0 ? -x - P : x), by + top, P, Math.max(P, bottom - top));
       };
-      const ear = wideLayout ? EAR_WIDE : EAR_NORMAL;
+      const ear = xbox ? EAR_SMALL : wideLayout ? EAR_WIDE : EAR_NORMAL;
       ear.outline.forEach(([x, y]) => at(x, y, C.ink));
       ear.list.forEach(([x, y, v]) => at(x, y, v === 'in' ? C.earIn : C.gray));
     });
@@ -375,10 +377,10 @@
       if (xbox) {
         if (bun) ears(33, 4);
         if (cat) {
-          [77, 83].forEach(ex => {
-            [[-P, 0], [P, 0], [0, -P], [0, P]].forEach(([dx, dy]) => sprite(EAR, ex + dx, 31.5 + dy, C.ink, true));
-            sprite(EAR, ex, 31.5, C.gray, true);
-            sprite(['##', '##', '##'], ex, 32.25, C.bean, true);
+          [75.5, 84.5].forEach(ex => { // at the two upper corners of the round "head", partly behind it
+            [[-P, 0], [P, 0], [0, -P], [0, P]].forEach(([dx, dy]) => sprite(EAR, ex + dx, 32.5 + dy, C.ink, true));
+            sprite(EAR, ex, 32.5, C.gray, true);
+            sprite(['##', '##', '##'], ex, 33.25, C.bean, true);
           });
         }
         guide(b.touchpad);
