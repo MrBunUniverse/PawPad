@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PawPad setup guide</title>
+<style>
+  :root { --bg: #130f0e; --panel: #1b1513; --edge: #3d312b; --text: #f3ead9; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 40px; }
+  canvas { display: block; }
+  #retroCanvas { width: 366px; max-width: 100%; height: auto; margin: 0 auto; image-rendering: pixelated; }
+  @media (max-width: 420px) { #retroCanvas { width: 244px; } }
+  #head { margin-bottom: 18px; }
+  #foot { margin-top: 18px; }
+  .card { background: var(--panel); border: 2px solid var(--edge); padding: 16px; margin: 14px 0; box-sizing: border-box; }
+  .row { display: flex; align-items: center; }
+  .card > canvas { margin: 10px 0 0 50px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <canvas id="retroCanvas" width="122" height="70" aria-hidden="true"></canvas>
+  <div id="head"></div>
+  <div id="steps"></div>
+  <div id="foot"></div>
+  <div class="sr-only" id="sr"></div>
+</main>
+<!-- Same pixel-art controller as the overlay: this loads the app's own renderer. -->
+<script src="../obs-overlay/retro.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const COLORS = { ink: '#000000', brown: '#8b4a1b', yellow: '#fcd000', text: '#f3ead9', dim: '#a39484', accent: '#e58a76', mint: '#7fbf8a', edge: '#3d312b', raise: '#261e1b' };
+  const INTRO = 'Four steps to get your controller on stream. Step 1 is only needed if you play on a PS4.';
+  const STEPS = [
+    {
+      title: 'Put the plugin on your PS4',
+      note: 'Only needed if you play on the PS4.',
+      items: [
+        'You need a PS4 with GoldHEN installed, version 2.2 or newer.',
+        'Connect with an FTP app such as FileZilla, using port 2121.',
+        'Copy pad_stream.prx to the PS4 folder:',
+        { code: '/data/GoldHEN/plugins/' },
+        "Copy pad_stream.ini to /data/GoldHEN/, open it and set ip to your computer's address. PawPad shows it in step 2.",
+        'Open /data/GoldHEN/plugins.ini and add these lines (keep anything already in there):',
+        { code: '[default]' },
+        { code: '/data/GoldHEN/plugins/pad_stream.prx' },
+        'Restart the game, or the PS4, so GoldHEN loads the plugin.'
+      ]
+    },
+    {
+      title: 'Open PawPad on your computer',
+      items: [
+        'Download the zip for your computer from the Releases page and unzip it. Keep the native folder next to the PawPad program.',
+        'Mac: right-click bridge, choose Open, and allow incoming connections if asked.',
+        'Windows: open bridge.exe and allow it through the firewall.',
+        "Linux: run chmod +x bridge once if it won't open.",
+        'A window shows the address for pad_stream.ini and the OBS link. Keep it open while you stream.'
+      ]
+    },
+    {
+      title: 'Add it to OBS',
+      items: [
+        'In OBS, click + under Sources and choose Browser.',
+        'Set the URL to:',
+        { code: 'http://localhost:8080/?hideUI=1' },
+        'Set Width to 488, Height to 280 and FPS to 60.',
+        'Leave Custom CSS as it is, then resize the source however you like.',
+        'Changed something in PawPad later? Right-click the source and choose Refresh cache of current page.'
+      ]
+    },
+    {
+      title: 'Pick your look',
+      items: [
+        'In a web browser, go to:',
+        { code: 'http://localhost:8080/' },
+        'Open Settings. Your choices show up in OBS right away, so the OBS link never changes.',
+        'Choose the Controller (Auto, PlayStation or Xbox), the Style (Classic, Fine, Bun or Cat) and the rest of the options.'
+      ]
+    }
+  ];
+
+  // 5x7 pixel font: seven rows of five cells per glyph, 1 = lit.
+  // ponytail: covers letters, digits and basic punctuation only; add glyphs if the text needs more.
+  const GLYPHS = {
+    ' ': '00000 00000 00000 00000 00000 00000 00000',
+    'A': '01110 10001 10001 11111 10001 10001 10001',
+    'B': '11110 10001 10001 11110 10001 10001 11110',
+    'C': '01110 10001 10000 10000 10000 10001 01110',
+    'D': '11100 10010 10001 10001 10001 10010 11100',
+    'E': '11111 10000 10000 11110 10000 10000 11111',
+    'F': '11111 10000 10000 11110 10000 10000 10000',
+    'G': '01110 10001 10000 10111 10001 10001 01111',
+    'H': '10001 10001 10001 11111 10001 10001 10001',
+    'I': '01110 00100 00100 00100 00100 00100 01110',
+    'J': '00111 00010 00010 00010 00010 10010 01100',
+    'K': '10001 10010 10100 11000 10100 10010 10001',
+    'L': '10000 10000 10000 10000 10000 10000 11111',
+    'M': '10001 11011 10101 10101 10001 10001 10001',
+    'N': '10001 10001 11001 10101 10011 10001 10001',
+    'O': '01110 10001 10001 10001 10001 10001 01110',
+    'P': '11110 10001 10001 11110 10000 10000 10000',
+    'Q': '01110 10001 10001 10001 10101 10010 01101',
+    'R': '11110 10001 10001 11110 10100 10010 10001',
+    'S': '01111 10000 10000 01110 00001 00001 11110',
+    'T': '11111 00100 00100 00100 00100 00100 00100',
+    'U': '10001 10001 10001 10001 10001 10001 01110',
+    'V': '10001 10001 10001 10001 10001 01010 00100',
+    'W': '10001 10001 10001 10101 10101 10101 01010',
+    'X': '10001 10001 01010 00100 01010 10001 10001',
+    'Y': '10001 10001 01010 00100 00100 00100 00100',
+    'Z': '11111 00001 00010 00100 01000 10000 11111',
+    'a': '00000 00000 01110 00001 01111 10001 01111',
+    'b': '10000 10000 10110 11001 10001 10001 11110',
+    'c': '00000 00000 01110 10000 10000 10001 01110',
+    'd': '00001 00001 01101 10011 10001 10001 01111',
+    'e': '00000 00000 01110 10001 11111 10000 01110',
+    'f': '00110 01001 01000 11100 01000 01000 01000',
+    'g': '00000 00000 01111 10001 10001 01111 11110',
+    'h': '10000 10000 10110 11001 10001 10001 10001',
+    'i': '00100 00000 01100 00100 00100 00100 01110',
+    'j': '00010 00000 00110 00010 00010 10010 01100',
+    'k': '10000 10000 10010 10100 11000 10100 10010',
+    'l': '01100 00100 00100 00100 00100 00100 01110',
+    'm': '00000 00000 11010 10101 10101 10101 10101',
+    'n': '00000 00000 10110 11001 10001 10001 10001',
+    'o': '00000 00000 01110 10001 10001 10001 01110',
+    'p': '00000 00000 11110 10001 10001 11110 10000',
+    'q': '00000 00000 01101 10011 10001 01111 00001',
+    'r': '00000 00000 10110 11001 10000 10000 10000',
+    's': '00000 00000 01111 10000 01110 00001 11110',
+    't': '01000 01000 11100 01000 01000 01001 00110',
+    'u': '00000 00000 10001 10001 10001 10011 01101',
+    'v': '00000 00000 10001 10001 10001 01010 00100',
+    'w': '00000 00000 10001 10001 10101 10101 01010',
+    'x': '00000 00000 10001 01010 00100 01010 10001',
+    'y': '00000 00000 10001 10001 10001 01111 00001',
+    'z': '00000 00000 11111 00010 00100 01000 11111',
+    '0': '01110 10001 10011 10101 11001 10001 01110',
+    '1': '00100 01100 00100 00100 00100 00100 01110',
+    '2': '01110 10001 00001 00010 00100 01000 11111',
+    '3': '11111 00010 00100 00010 00001 10001 01110',
+    '4': '00010 00110 01010 10010 11111 00010 00010',
+    '5': '11111 10000 11110 00001 00001 10001 01110',
+    '6': '00110 01000 10000 11110 10001 10001 01110',
+    '7': '11111 00001 00010 00100 01000 01000 01000',
+    '8': '01110 10001 10001 01110 10001 10001 01110',
+    '9': '01110 10001 10001 01111 00001 00010 01100',
+    '.': '00000 00000 00000 00000 00000 01100 01100',
+    ',': '00000 00000 00000 00000 01100 00100 01000',
+    ':': '00000 01100 01100 00000 01100 01100 00000',
+    '-': '00000 00000 00000 11111 00000 00000 00000',
+    '+': '00000 00100 00100 11111 00100 00100 00000',
+    '!': '00100 00100 00100 00100 00100 00000 00100',
+    '?': '01110 10001 00001 00010 00100 00000 00100',
+    "'": '00100 00100 01000 00000 00000 00000 00000',
+    '/': '00001 00010 00010 00100 01000 01000 10000',
+    '(': '00010 00100 01000 01000 01000 00100 00010',
+    ')': '01000 00100 00010 00010 00010 00100 01000',
+    '[': '01110 01000 01000 01000 01000 01000 01110',
+    ']': '01110 00010 00010 00010 00010 00010 01110',
+    '_': '00000 00000 00000 00000 00000 00000 11111',
+    '=': '00000 00000 11111 00000 11111 00000 00000'
+  };
+  const FONT = {};
+  for (const ch in GLYPHS) FONT[ch] = GLYPHS[ch].split(' ').map(row => [...row].map(c => c === '1'));
+
+  const cell = (P) => 6 * P;      // one glyph advance: five cells plus a gap cell
+  const lineH = (P) => 9 * P;     // one text line: seven rows plus a two-row gap
+  const textW = (s, P) => s.length ? s.length * cell(P) - P : 0;
+
+  function paintText(ctx, s, x, y, P, color) {
+    ctx.fillStyle = color;
+    [...s].forEach((ch, i) => {
+      (FONT[ch] || FONT['?']).forEach((row, r) => row.forEach((on, c) => {
+        if (on) ctx.fillRect(x + i * cell(P) + c * P, y + r * P, P, P);
+      }));
+    });
+  }
+
+  // Break text into lines that fit maxW CSS px. Words too long for a line (paths, URLs) are cut up.
+  function wrap(s, P, maxW) {
+    const per = Math.max(1, Math.floor((maxW + P) / cell(P)));
+    const lines = [];
+    let line = '';
+    for (let word of s.split(' ')) {
+      while (word.length > per) {
+        if (line) { lines.push(line); line = ''; }
+        const slash = word.lastIndexOf('/', per - 1), cut = slash > 0 ? slash + 1 : per; // prefer breaking after a /
+        lines.push(word.slice(0, cut));
+        word = word.slice(cut);
+      }
+      const next = line ? line + ' ' + word : word;
+      if (next.length > per) { lines.push(line); line = word; } else line = next;
+    }
+    lines.push(line);
+    return lines;
+  }
+
+  // A canvas of w x h CSS px, backed at device resolution so the pixels stay sharp.
+  function makeCanvas(w, h) {
+    const dpr = window.devicePixelRatio || 1;
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    return { cv, ctx };
+  }
+
+  // Stacks pixel-text items top to bottom in one canvas `width` CSS px wide.
+  // Item: { s, P (pixel size), c (colour), mb (gap below), bullet, chip, center, shadow }.
+  function stack(items, width) {
+    const plan = [];
+    let y = 0;
+    for (const it of items) {
+      const P = it.P, pad = it.chip ? 6 : 0;
+      const left = it.chip ? pad : it.bullet ? 4 * P : 0;
+      const lines = wrap(it.s, P, width - left - pad);
+      const h = (lines.length - 1) * lineH(P) + 7 * P + 2 * pad + (it.shadow ? P : 0);
+      plan.push({ it, lines, left, pad, top: y, h });
+      y += h + (it.mb || 0);
+    }
+    const { cv, ctx } = makeCanvas(width, Math.max(1, y - (items[items.length - 1].mb || 0)));
+    for (const { it, lines, left, pad, top, h } of plan) {
+      const P = it.P;
+      if (it.chip) { // code box: a raised panel with an edge
+        ctx.fillStyle = COLORS.edge; ctx.fillRect(0, top, width, h);
+        ctx.fillStyle = COLORS.raise; ctx.fillRect(P, top + P, width - 2 * P, h - 2 * P);
+      }
+      if (it.bullet) { ctx.fillStyle = COLORS.yellow; ctx.fillRect(0, top + 2 * P, 2 * P, 2 * P); }
+      lines.forEach((ln, i) => {
+        const ty = top + pad + i * lineH(P);
+        const tx = it.center ? Math.round((width - textW(ln, P)) / 2) : left;
+        if (it.shadow) paintText(ctx, ln, tx + P, ty + P, P, it.shadow);
+        paintText(ctx, ln, tx, ty, P, it.c);
+      });
+    }
+    return cv;
+  }
+
+  // Numbered badge: yellow square with an ink border, like the pixel buttons.
+  function badge(n) {
+    const s = String(n), { cv, ctx } = makeCanvas(36, 36);
+    ctx.fillStyle = COLORS.ink; ctx.fillRect(0, 0, 36, 36);
+    ctx.fillStyle = COLORS.yellow; ctx.fillRect(3, 3, 30, 30);
+    paintText(ctx, s, Math.round((36 - textW(s, 3)) / 2), Math.round((36 - 21) / 2), 3, COLORS.ink);
+    cv.style.marginRight = '14px';
+    cv.style.flex = 'none';
+    return cv;
+  }
+
+  // Quick start items: plain strings become bullets, { code } becomes a code box.
+  function bodyItems(step) {
+    const items = [];
+    if (step.note) items.push({ s: step.note, P: 2, c: COLORS.dim, mb: 12 });
+    for (const it of step.items) {
+      items.push(typeof it === 'string'
+        ? { s: it, P: 2, c: COLORS.text, bullet: true, mb: 10 }
+        : { s: it.code, P: 2, c: COLORS.mint, chip: true, mb: 10 });
+    }
+    return items;
+  }
+
+  function contentWidth(el) {
+    const cs = getComputedStyle(el);
+    return el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  }
+
+  function render() {
+    const head = document.getElementById('head');
+    head.textContent = '';
+    head.appendChild(stack([
+      { s: 'PAWPAD', P: 6, c: COLORS.yellow, shadow: COLORS.brown, center: true, mb: 10 },
+      { s: 'SETUP GUIDE', P: 3, c: COLORS.accent, center: true, mb: 14 },
+      { s: INTRO, P: 2, c: COLORS.text, center: true }
+    ], contentWidth(head)));
+
+    const list = document.getElementById('steps');
+    list.textContent = '';
+    STEPS.forEach((step, i) => {
+      const card = document.createElement('section');
+      card.className = 'card';
+      list.appendChild(card);
+      const inner = contentWidth(card), textWidth = inner - 50; // 50 = badge + gap, the text indent
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.appendChild(badge(i + 1));
+      row.appendChild(stack([{ s: step.title, P: 3, c: COLORS.yellow }], textWidth));
+      card.appendChild(row);
+      card.appendChild(stack(bodyItems(step), textWidth));
+    });
+
+    const foot = document.getElementById('foot');
+    foot.textContent = '';
+    foot.appendChild(stack([{ s: 'Stuck? See Troubleshooting in README.md.', P: 2, c: COLORS.dim, center: true }], contentWidth(foot)));
+  }
+
+  // Canvas text can't be read or selected by screen readers, so the same content goes in a hidden list.
+  const sr = document.getElementById('sr');
+  const srList = document.createElement('ol');
+  STEPS.forEach((step) => {
+    const li = document.createElement('li');
+    li.textContent = step.title + '. ' + step.items.map(it => typeof it === 'string' ? it : it.code).join(' ');
+    srList.appendChild(li);
+  });
+  sr.appendChild(srList);
+
+  if (window.RetroPad) window.RetroPad.draw({}); // idle controller, same drawing as the overlay
+  render();
+  window.addEventListener('resize', render);
+})();
+</script>
+</body>
+</html>
