@@ -1,0 +1,4 @@
+; Add to /data/GoldHEN/plugins.ini on the PS4 (merge with your existing entries).
+; Put the line under [default] to load it for every game, or under a game's title ID, e.g. [CUSA12085].
+[default]
+/data/GoldHEN/plugins/pad_stream.prx

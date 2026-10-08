@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PawPad</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="stage"><canvas id="retroCanvas" width="122" height="70"></canvas></main>
+
+  <div id="connectionStatus" class="status"><i></i><span id="statusText">Connecting…</span></div>
+  <button id="settingsToggleBtn" class="gear">Settings</button>
+
+  <aside id="settingsPanel" class="panel">
+    <header>
+      <h1>Paw<em>Pad</em></h1>
+      <button id="closePanelBtn" aria-label="Close">×</button>
+    </header>
+
+    <div class="scroll">
+      <section>
+        <h2>Look</h2>
+        <div class="field">
+          <span class="lbl">Style</span>
+          <select id="styleInput" data-seg><option value="classic">Classic</option><option value="fine">Fine</option><option value="bun">Bun</option><option value="cat">Cat</option></select>
+        </div>
+        <div class="field" id="toneRow">
+          <span class="lbl">Colors</span>
+          <select id="toneInput" data-seg><option value="default">Default</option><option value="midnight">Midnight</option></select>
+        </div>
+        <div class="field" id="coatRow">
+          <span class="lbl">Which cat</span>
+          <select id="coatInput" data-seg="swatch"><option value="pumpkin">Pumpkin</option><option value="shadow">Shadow</option><option value="snowball">Snowball</option><option value="smokey">Smokey</option><option value="mittens">Mittens</option></select>
+        </div>
+      </section>
+
+      <section>
+        <h2>Layout</h2>
+        <div class="field">
+          <span class="lbl">Shape</span>
+          <select id="layoutInput" data-seg><option value="normal">Normal</option><option value="wide">Wide</option></select>
+        </div>
+        <label class="switch"><span>Touchpad</span><input type="checkbox" id="padToggle" checked><b></b></label>
+      </section>
+
+      <section>
+        <h2>Signal</h2>
+        <label class="slider"><span>Capture delay</span><output id="delayVal">0 ms</output>
+          <input type="range" id="delayInput" min="0" max="500" step="10" value="0"></label>
+        <label class="slider"><span>Stick deadzone</span><output id="deadzoneVal">6%</output>
+          <input type="range" id="deadzoneInput" min="0" max="30" step="1" value="6"></label>
+        <label class="switch"><span>Test mode</span><input type="checkbox" id="simulatorToggle"><b></b></label>
+      </section>
+
+      <section class="target">
+        <h2>PS4 target</h2>
+        <code id="detectedIp">127.0.0.1:9999</code>
+      </section>
+    </div>
+
+    <button id="copyObsUrlBtn" class="copy">Copy OBS URL</button>
+  </aside>
+
+  <script src="retro.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

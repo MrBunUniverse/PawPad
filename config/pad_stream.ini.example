@@ -1,0 +1,13 @@
+; Copy to /data/GoldHEN/pad_stream.ini on the PS4 and set your own values.
+; (Your real config/pad_stream.ini stays on your machine and is not part of the repository.)
+
+[Network]
+; IP address of the computer running the bridge (the bridge prints it when it starts)
+ip = 192.168.1.100
+
+; UDP port, must match the bridge
+port = 9999
+
+[Performance]
+; Milliseconds between updates (16 = about 60 per second, 8 = about 120)
+poll_rate_ms = 16

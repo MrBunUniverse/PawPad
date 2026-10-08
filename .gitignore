@@ -1,0 +1,38 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# C / PS4 Build artifacts
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.o
+*.elf
+*.prx.stub
+
+# Temporary files
+*.tmp
+*.bak
+
+dist/
+scripts/.build/
+
+# Tooling cache
+.impeccable/hook.cache.json
+
+# Personal / local only
+config/pad_stream.ini
+config/plugins.ini
+
+# Build outputs: shipped through GitHub Releases, not committed
+*.prx
+PawPad.app/
+PS4 Controller Overlay.app/
+mac-app/assets/AppIcon.iconset/
+mac-app/assets/icon_1024.png
