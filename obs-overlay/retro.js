@@ -18,7 +18,14 @@
       g: { lt: [-21, 2], rt: [80, 2], dpad: [1, -31], share: [1, -19], ls: [13, -40], pad: [26, -22], rs: [39, -40], options: [51, -19], face: [54, -29] }
     }
   };
-  let W = 122, H = 70, OX = 20, OY = 1, G = SHIFT0, showPad = true, wideLayout = false; // canvas is cropped tight to the buttons
+  // Xbox arrangement: staggered sticks (left stick up, d-pad and right stick lower), View / Guide / Menu in the middle.
+  // Shifts are relative to the same base positions as above. The Guide button takes the touchpad's slot ('pad' group).
+  const XBOX = {
+    normal: { lt: [0, 0], rt: [0, 0], dpad: [30, 11], share: [14, -1], ls: [-24, -14], pad: [0, -8], rs: [-4, 2], options: [-14, -1], face: [0, -3] },
+    wide: { W: 200, g: { lt: [-21, 2], rt: [60, 2], dpad: [28, -31], share: [28, -19], ls: [-24, -40], pad: [16, -22], rs: [30, -40], options: [4, -19], face: [34, -29] } }
+  };
+  const GAP = { ps: 35, xbox: 15 }; // room the touchpad / Guide button takes in the wide row (width + gap)
+  let W = 122, H = 70, OX = 20, OY = 1, G = SHIFT0, showPad = true, wideLayout = false, xbox = false; // canvas is cropped tight to the buttons
   const C = {
     ink: '#000000',
     gray: '#3a3a4a', grayHi: '#8a8a9c', grayLo: '#1f1f2a', white: '#ffffff',
@@ -26,7 +33,7 @@
     empty: '#14141c',
     text: '#ffffff', capFill: null, capHi: null, capLo: null, bean: '#ff9fb0', dim: null,
     on: '#fcd000', onHi: '#ffffff', onLo: '#fcb000',      // "pressed" colours of bumpers, pills, d-pad arms
-    tri: '#43b047', cir: '#ff4d6d', crs: '#2e8bff', sqr: '#ff5fc4', // face button colours
+    tri: '#43b047', cir: '#ff4d6d', crs: '#2e8bff', sqr: '#ff5fc4', yel: '#fcd000', // face button colours
     m1: '#43b047', m2: '#fcd000', m3: '#e52521',          // L2/R2 meter: low / mid / high
     pad: null, padHi: null, padLo: null, eye: '#b58b4c', blush: '#f2a39a', earIn: '#f0c4b8'
   };
@@ -44,7 +51,7 @@
   const BUN = {
     ink: '#4a3228', gray: '#efe6d6', grayHi: '#fbf6ec', grayLo: '#cdb999', dim: '#b9a688', text: '#5a3d33', empty: '#6b5043',
     on: '#f0907a', onHi: '#ffd6ca', onLo: '#c9654f', brown: '#a85a4e',
-    tri: '#4fae7b', cir: '#e0606e', crs: '#5a8fd8', sqr: '#e873ae',
+    tri: '#4fae7b', cir: '#e0606e', crs: '#5a8fd8', sqr: '#e873ae', yel: '#e8b84a',
     m1: '#7fbf8a', m2: '#f2c75c', m3: '#d9645a',
     pad: '#e0907e', padHi: '#f2b5a6', padLo: '#b8665a', eye: '#b58b4c', blush: '#f2a39a', earIn: '#f0c4b8'
   };
@@ -122,6 +129,31 @@
   const EAR_NORMAL = makeEar([-2, -12], [-11, -3], 3.1, 2.2);
   // Wide layout: the sticks sit right beside the pad, so the ears are shorter and droop less (no overlap, no clipping).
   const EAR_WIDE = makeEar([-0.5, -9], [-4.5, -4.5], 3.0, 2.1);
+  // Xbox: the Guide button is small (a round head, not a wide pad), so the ears are small too.
+  const EAR_SMALL = makeEar([-0.5, -5.5], [-4, -3], 1.9, 1.3);
+  // Xbox cat: two tilted triangle ears that rise out from behind the round Guide button (it is drawn on top of
+  // their bases), so they wrap around its upper corners instead of floating beside it. Left ear shown; the right one mirrors it.
+  const CAT_EAR_X = (() => {
+    const S = 0.5, cells = new Map();
+    const inTri = (px, py, a, b, c) => {
+      const d = (p, q, r) => (p[0] - r[0]) * (q[1] - r[1]) - (q[0] - r[0]) * (p[1] - r[1]);
+      const d1 = d([px, py], a, b), d2 = d([px, py], b, c), d3 = d([px, py], c, a);
+      return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+    };
+    const outer = [[-2.8, 0.5], [2.4, 0.5], [-3.4, -4.6]], inner = [[-1.5, 0], [1.2, 0], [-2.5, -3.2]];
+    for (let y = -6; y <= 1; y += S) for (let x = -5; x <= 4; x += S) {
+      if (!inTri(x + S / 2, y + S / 2, ...outer)) continue;
+      cells.set(x + ',' + y, inTri(x + S / 2, y + S / 2, ...inner) ? 'in' : 'fur');
+    }
+    const list = [...cells].map(([k, v]) => [...k.split(',').map(Number), v]);
+    const outline = new Set();
+    for (const [x, y] of list) for (const [dx, dy] of [[S, 0], [-S, 0], [0, S], [0, -S]]) {
+      const k = (x + dx) + ',' + (y + dy);
+      if (!cells.has(k)) outline.add(k);
+    }
+    return { list, outline: [...outline].map(k => k.split(',').map(Number)) };
+  })();
+
   // Touchpad press (finger down or button click): the ears pop up and settle in a few stepped frames.
   // Very small on purpose (a pixel or two): pushing down squashes the ears a hair, letting go pops them back up a hair.
   const BOING_DOWN = [0.95, 0.98, 1];      // vertical ear scale per frame
@@ -141,14 +173,14 @@
       draw(...last); // the frame index is part of the repaint key, so a new frame always redraws
     }, 30);
   }
-  function ears(by) {
+  function ears(by, half = 12) { // half = distance of each ear base from the centre (80)
     const f = boingFrame(), sy = f < 0 ? 1 : boingSeq[f];
-    [[68, 1], [92, -1]].forEach(([bx, m]) => {
+    [[80 - half, 1], [80 + half, -1]].forEach(([bx, m]) => {
       const at = (x, y, c) => { // cells are rescaled from the ear base (y = 0) and snapped to the pixel grid
         const top = Math.round(y * sy / P) * P, bottom = Math.round((y + P) * sy / P) * P;
         ctx.fillStyle = c; ctx.fillRect(bx + (m < 0 ? -x - P : x), by + top, P, Math.max(P, bottom - top));
       };
-      const ear = wideLayout ? EAR_WIDE : EAR_NORMAL;
+      const ear = xbox ? EAR_SMALL : wideLayout ? EAR_WIDE : EAR_NORMAL;
       ear.outline.forEach(([x, y]) => at(x, y, C.ink));
       ear.list.forEach(([x, y, v]) => at(x, y, v === 'in' ? C.earIn : C.gray));
     });
@@ -159,14 +191,17 @@
   const ctx = canvas.getContext('2d');
   // P = size of one drawn pixel in logical units: 1 = classic, 0.5 = fine (2x denser grid).
   let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false;
-  function setStyle(name, coat, tone, layout, pad) {
+  function setStyle(name, coat, tone, layout, pad, controller) {
     ({ W, H, OX, OY, g: G } = LAYOUTS[layout] || LAYOUTS.normal);
     showPad = pad !== false;
     wideLayout = layout === 'wide';
-    if (!showPad && G !== SHIFT0) { // wide row: close the gap the touchpad leaves (32 wide + 3 gap)
+    xbox = controller === 'xbox';
+    if (xbox) { G = wideLayout ? XBOX.wide.g : XBOX.normal; if (wideLayout) W = XBOX.wide.W; }
+    if (!showPad && wideLayout) { // wide row: close the gap the touchpad / Guide button leaves
+      const gap = xbox ? GAP.xbox : GAP.ps;
       G = { ...G };
-      ['rs', 'options', 'face', 'rt'].forEach(n => { G[n] = [G[n][0] - 35, G[n][1]]; });
-      W -= 35;
+      ['rs', 'options', 'face', 'rt'].forEach(n => { G[n] = [G[n][0] - gap, G[n][1]]; });
+      W -= gap;
     }
     cat = name === 'cat';
     bun = name === 'bun';
@@ -308,11 +343,29 @@
     disc(tx, ty, 2, pressed ? C.gold : C.grayLo, true);
   }
 
+  // Xbox face buttons: the same four slots, labelled A (bottom) B (right) X (left) Y (top).
+  const LETTERS = {
+    cross: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],      // A
+    circle: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],     // B
+    square: ['#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'],    // X
+    triangle: ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..']   // Y
+  };
+  const XBOX_COLOUR = () => ({ cross: C.tri, circle: C.cir, square: C.crs, triangle: C.yel });
+  const GUIDE_LOGO = ['#.#', '.#.', '#.#'];
+  // The round Guide button sits where the touchpad is on the PlayStation pad (centre 80, 38).
+  function guide(on) {
+    const cy = 38 + (on ? 1 : 0);
+    ball(80, cy, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo);
+    sprite(GUIDE_LOGO, 80, cy, on ? C.white : C.dim);
+  }
+
   function face(name, cx, cy, color, on) {
     cy += on ? 1 : 0;
+    if (xbox) color = XBOX_COLOUR()[name];
     ball(cx, cy, 5, on ? color : C.gray, on ? C.white : C.grayHi, on ? C.ink : C.grayLo);
     const ink = on ? C.white : color;
-    if (P < 1) sprite(FINE_SYMBOLS[name], cx, cy + (name === 'triangle' ? -1 : 0), ink, true); // triangle nudged up so its centre of mass sits on the button centre
+    if (xbox) sprite(LETTERS[name], cx, cy, ink);
+    else if (P < 1) sprite(FINE_SYMBOLS[name], cx, cy + (name === 'triangle' ? -1 : 0), ink, true); // triangle nudged up so its centre of mass sits on the button centre
     else sprite(SPRITES[name], cx, cy, ink);
   }
 
@@ -340,9 +393,22 @@
     at('lt', () => { trigger(22, tr.l2_norm || 0); bumper(22, b.l1); });
     at('rt', () => { trigger(116, tr.r2_norm || 0); bumper(116, b.r1); });
 
-    // Touchpad is a block: bounces when touched, darkens when clicked.
-    const by = touching ? 29 : 31;
+    // PlayStation: the touchpad is a block that bounces when touched and darkens when clicked.
+    // Xbox: a round Guide button (the same 'touchpad' slot). Bun / Cat ears sit on whichever it is.
+    const by = !xbox && touching ? 29 : 31;
     if (showPad) at('pad', () => {
+      if (xbox) {
+        if (bun) ears(33, 4);
+        if (cat) {
+          [[76.5, 1], [83.5, -1]].forEach(([ax, m]) => { // anchors sit inside the button's outline; the button covers the bases
+            const at = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(ax + (m < 0 ? -x - P : x), 35 + y, P, P); };
+            CAT_EAR_X.outline.forEach(([x, y]) => at(x, y, C.ink));
+            CAT_EAR_X.list.forEach(([x, y, v]) => at(x, y, v === 'in' ? C.bean : C.gray));
+          });
+        }
+        guide(b.touchpad);
+        return;
+      }
       if (bun) ears(by); // ears stay attached to the pad: they rise with it and boing on top
       if (cat) { // ears behind the touchpad, outlined in ink
         [69, 91].forEach(ex => {

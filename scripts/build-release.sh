@@ -57,6 +57,25 @@ cat > plugins.ini <<'INI'
 /data/GoldHEN/plugins/pad_stream.prx
 INI
 
+# Local-controller support: the SDL binding is a native add-on, which Node single-executables cannot embed.
+# Each zip gets native/sdl (the package's JavaScript + that platform's prebuilt sdl.node and SDL library) next to the bridge;
+# the bridge loads it at startup and stays PS4-only if the folder is missing.
+SDL_PKG="$ROOT/mac-receiver/node_modules/@kmamal/sdl"
+[ -f "$SDL_PKG/package.json" ] || { echo "@kmamal/sdl not installed (run npm ci in mac-receiver)"; exit 1; }
+SDL_VERSION="$(node -p "require('$SDL_PKG/package.json').version")"
+add_native() {  # add_native <target> <destination zip folder>
+    local target="$1" dest="$2" plat
+    case "$target" in win-x64) plat=win32-x64 ;; *) plat="$target" ;; esac
+    local archive="$BUILD/sdl.node-v$SDL_VERSION-$plat.tar.gz"
+    [ -f "$archive" ] || curl -fsSL "https://github.com/kmamal/node-sdl/releases/download/v$SDL_VERSION/sdl.node-v$SDL_VERSION-$plat.tar.gz" -o "$archive"
+    local sdl="$dest/native/sdl"
+    mkdir -p "$sdl/dist" "$sdl/src"
+    cp "$SDL_PKG/package.json" "$SDL_PKG/LICENSE" "$sdl/"
+    cp -R "$SDL_PKG/src/javascript" "$sdl/src/javascript"
+    tar -xzf "$archive" -C "$sdl/dist"
+    case "$target" in darwin-*) codesign --force --sign - "$sdl"/dist/*.dylib "$sdl/dist/sdl.node" 2>/dev/null || true ;; esac
+}
+
 echo "[3/4] Building executables..."
 for target in $TARGETS; do
     case "$target" in
@@ -83,6 +102,7 @@ for target in $TARGETS; do
     pkg="PawPad-$target"
     mkdir -p "$DIST/$pkg"
     mv "$work/$exe" "$DIST/$pkg/"
+    add_native "$target" "$DIST/$pkg"
     cp "$ROOT/pad_stream.prx" "$BUILD/pad_stream.ini" "$BUILD/plugins.ini" "$DIST/$pkg/"
     [ -f "$ROOT/README.md" ] && cp "$ROOT/README.md" "$DIST/$pkg/"
     [ -f "$ROOT/LICENSE" ] && cp "$ROOT/LICENSE" "$DIST/$pkg/"

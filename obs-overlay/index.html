@@ -22,6 +22,10 @@
       <section>
         <h2>Look</h2>
         <div class="field">
+          <span class="lbl">Controller</span>
+          <select id="controllerInput" data-seg><option value="auto">Auto</option><option value="ps">PlayStation</option><option value="xbox">Xbox</option></select>
+        </div>
+        <div class="field">
           <span class="lbl">Style</span>
           <select id="styleInput" data-seg><option value="classic">Classic</option><option value="fine">Fine</option><option value="bun">Bun</option><option value="cat">Cat</option></select>
         </div>
@@ -41,11 +45,15 @@
           <span class="lbl">Shape</span>
           <select id="layoutInput" data-seg><option value="normal">Normal</option><option value="wide">Wide</option></select>
         </div>
-        <label class="switch"><span>Touchpad</span><input type="checkbox" id="padToggle" checked><b></b></label>
+        <label class="switch"><span id="padLabel">Touchpad</span><input type="checkbox" id="padToggle" checked><b></b></label>
       </section>
 
       <section>
         <h2>Signal</h2>
+        <div class="field">
+          <span class="lbl">Source</span>
+          <select id="sourceInput" data-seg><option value="auto">Auto</option><option value="ps4">PS4</option><option value="local">This computer</option></select>
+        </div>
         <label class="slider"><span>Capture delay</span><output id="delayVal">0 ms</output>
           <input type="range" id="delayInput" min="0" max="500" step="10" value="0"></label>
         <label class="slider"><span>Stick deadzone</span><output id="deadzoneVal">6%</output>

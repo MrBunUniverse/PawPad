@@ -1,63 +1,69 @@
 # PawPad
 
-**Your PS4 controller, but cute. Live in OBS.**
+**Show your controller on stream, but cute.**
 
-PawPad shows your PS4 controller inputs on stream as pixel-art buttons: pressed buttons light up (or squish), the sticks move, and L2/R2 show how hard you're pulling them (0–100). It has several looks, including a floppy-eared **Bun** and a cat-eared **Cat**, and a wide layout for games with a cramped HUD.
+PawPad puts your controller on your stream as pixel-art buttons. Buttons light up when you press them, the sticks move, and L2/R2 show how far you're pulling them.
 
 ![PawPad: your PS4 controller, but cute. Shown in the Classic, Bun and Cat looks.](docs/looks.png)
 
-Most controller overlays read a pad plugged into your PC. PawPad reads it **on the console**: a GoldHEN plugin sends the inputs over your network, so it works when you play on the PS4 and capture with a capture card. (I couldn't find another tool that does this, but I may have missed one.)
+- **Pick a look:** Classic, Bun (a bunny with floppy ears), or Cat (five cat colors to choose from).
+- **Xbox look too:** it works with Xbox-style controllers.
+- **Play on PS4 or on your computer:** use a PS4 with a small plugin, or just plug a controller into your computer.
 
-```
-PS4 (GoldHEN plugin)  --UDP-->  Bridge (this app, on your PC/Mac)  --WebSocket-->  OBS Browser Source
-```
+![The Xbox look in Classic, Bun and Cat.](docs/xbox.png)
 
 ## What you need
 
-- A PS4 running **GoldHEN** (2.2 or newer).
-- A computer on the **same network** as the PS4 running OBS Studio (macOS, Windows or Linux).
-- An FTP client to copy files to the PS4 (GoldHEN's FTP server listens on port **2121**).
+- **Either** a PS4 with the **GoldHEN** mod (version 2.2 or newer) **or** a controller plugged into your computer.
+- A computer (Mac, Windows or Linux) on the **same Wi-Fi or network** as the PS4.
+- **OBS Studio**, the free app you stream with.
 
-## 1. Install the plugin on the PS4
+## Quick start
 
-1. Copy `pad_stream.prx` to `/data/GoldHEN/plugins/` on the PS4.
-2. Copy `pad_stream.ini` to `/data/GoldHEN/pad_stream.ini` and **set `ip`** to your computer's address (the bridge prints it when it starts, step 2).
-3. Add the plugin to `/data/GoldHEN/plugins.ini` (merge with what's already there):
+1. **Put the plugin on your PS4** (only needed if you play on the PS4). See [Step 1](#step-1-add-the-plugin-to-your-ps4).
+2. **Open PawPad on your computer.** See [Step 2](#step-2-open-pawpad-on-your-computer).
+3. **Add it to OBS.** See [Step 3](#step-3-add-it-to-obs).
+4. **Pick your look.** See [Step 4](#step-4-pick-your-look).
+
+Want to try it without a PS4? Turn on **Test mode** (see below).
+
+---
+
+## Step 1: Add the plugin to your PS4
+
+You need a PS4 with **GoldHEN** installed. You'll copy a few files to the PS4 with an FTP app (for example FileZilla). Use port **2121** to connect.
+
+1. Copy **`pad_stream.prx`** to the PS4 folder `/data/GoldHEN/plugins/`.
+2. Copy **`pad_stream.ini`** to `/data/GoldHEN/`, then open it and set **`ip`** to your computer's address. PawPad shows this address when you open it in Step 2.
+3. Open `/data/GoldHEN/plugins.ini` and add these lines (keep anything already in there):
 
    ```ini
    [default]
    /data/GoldHEN/plugins/pad_stream.prx
    ```
 
-   To load it only for specific games, put the line under that game's title ID instead, for example `[CUSA12085]`.
-4. Restart the game (or the console) so GoldHEN loads the plugin.
+4. Restart the game, or the PS4, so GoldHEN loads the plugin.
 
-`pad_stream.ini` options:
+Only want it in certain games? Put the line under that game's title ID (for example `[CUSA12085]`) instead of `[default]`.
 
-| Key | Meaning | Default |
+## Step 2: Open PawPad on your computer
+
+Download the zip for your computer from the **Releases** page and unzip it. Keep the `native` folder **next to** the PawPad program.
+
+| Your computer | Open this | First time |
 |---|---|---|
-| `ip` | Address of the computer running the bridge | none, you must set it |
-| `port` | UDP port, must match the bridge | `9999` |
-| `poll_rate_ms` | Milliseconds between updates (`16` ≈ 60/s, `8` ≈ 120/s) | `16` |
+| Windows | `bridge.exe` | Allow it through the firewall when asked |
+| Mac | `bridge` | Right-click it, then choose **Open**. Allow incoming connections if asked |
+| Linux | `bridge` | Run `chmod +x bridge` once if it won't open |
 
-## 2. Run the bridge
+A window opens and shows the **address** for `pad_stream.ini` and the **OBS link**. Keep it open while you stream.
 
-Download the zip for your system from the Releases page, unzip it, and run:
+If it says `waiting for packets...`, the PS4 isn't sending yet. See [Troubleshooting](#troubleshooting).
 
-| System | File | Notes |
-|---|---|---|
-| Windows | `bridge.exe` | Allow it through Windows Firewall on **private** networks when asked |
-| macOS | `bridge` | First launch: right-click → Open (it isn't notarised). Allow incoming connections if asked |
-| Linux | `bridge` | `chmod +x bridge` if needed |
+## Step 3: Add it to OBS
 
-The window prints the address to put in `pad_stream.ini` and the OBS URL. Keep it open while you stream.
-
-The status line shows `receiving N packets/s` once the PS4 is sending. If it says `waiting for packets...`, see Troubleshooting.
-
-## 3. Add it to OBS
-
-1. In OBS, add a **Browser** source.
-2. Set:
+1. In OBS, click **+** under **Sources** and choose **Browser**.
+2. Set these:
 
    | Setting | Value |
    |---|---|
@@ -66,117 +72,126 @@ The status line shows `receiving N packets/s` once the PS4 is sending. If it say
    | Height | `280` |
    | FPS | `60` |
 
-   Leave **Custom CSS** at its default. 488 × 280 keeps the pixels sharp; other sizes work, but the overlay scales to fit and can look uneven.
-3. Resize the source on your scene however you like.
+3. Leave **Custom CSS** as it is, then resize the source on your scene however you like.
 
-If you change anything on the bridge side later, right-click the source → **Refresh cache of current page**.
+Changed something in PawPad later? Right-click the source in OBS and choose **Refresh cache of current page**.
 
-## 4. Choose a look
+## Step 4: Pick your look
 
-Open `http://localhost:8080/` in a normal browser tab and use **Settings**. Whatever you pick is sent to the bridge, so **OBS follows live** with the same URL: no refresh and no new link to paste. The choice is remembered.
+In a web browser, go to **http://localhost:8080/** and open **Settings**. Your choices show up in OBS right away, so you never need to change the link.
 
-| Setting | Options |
+| Setting | What it does |
 |---|---|
-| **Style** | **Classic** (chunky pixels, the default), **Fine** (twice as many pixels: rounder corners, thinner outlines, segmented L2/R2 meter), **Bun** (Fine plus a cream bunny: floppy ears on a coral touchpad, pink bunny-paw sticks that squish when pressed, and ears that stay attached to the touchpad and give a tiny pixel "boing" when you push it down and again when you let go), **Cat** (Fine plus cat ears and paw-print sticks that squish when pressed) |
-| **Colors** (Fine) | **Default**, or **Midnight**, a dark palette without the animal extras |
-| **Which cat** (Cat) | Pumpkin (orange), Shadow (black), Snowball (white), Smokey (gray), Mittens (Siamese) |
-| **Layout** | **Normal**, or **Wide**: one short row with L2/L1 at the left end and R2/R1 at the right, for games with a cramped HUD |
-| **Touchpad** | Show or hide the touchpad block (the wide row closes the gap) |
+| **Controller** | **Auto** picks the right controller for what you plug in. You can also choose **PlayStation** or **Xbox** |
+| **Style** | **Classic** (chunky pixels, the default). **Fine** (smoother and sharper). **Bun** (a cute bunny with ears that bounce when you press the touchpad). **Cat** (cat ears and paw-print sticks) |
+| **Colors** | For Fine: **Default**, or **Midnight** (dark) |
+| **Which cat** | For Cat: Pumpkin, Shadow, Snowball, Smokey or Mittens |
+| **Layout** | **Normal**, or **Wide** (one short row, handy when a game's HUD is in the way) |
+| **Touchpad** | Show or hide the touchpad (or the Guide button on the Xbox look) |
+| **Source** | **Auto** (the PS4 when it's sending, otherwise your computer's controller), **PS4**, or **This computer** |
 
-The Browser Source stays **488 × 280** in every layout. The wide row is drawn at full width inside the same box and the space above and below it is transparent, so nothing needs resizing when you switch.
+The overlay stays **488 × 280** in every layout, so you never need to resize it.
 
-### Capture-card delay
+### Overlay running behind your video?
 
-If the overlay is ahead of your video, raise **Capture delay** in Settings, or put it in the URL: `?hideUI=1&delay=120` (milliseconds, 0–500).
+If the buttons show up before the game does on your stream, raise **Capture delay** in Settings. You can also add `&delay=120` to the OBS link (the number is milliseconds, 0 to 500).
 
-### URL options
+---
 
-URL options pin that page to a value and ignore the live changes from Settings. Use them only if you want a fixed look.
+## Use a controller plugged into your computer
 
-| Option | Example | Effect |
-|---|---|---|
-| `hideUI=1` | | Hides the status and settings (use this in OBS) |
-| `preset` | `preset=bun` | One-word look: `classic`, `fine`, `fine-midnight`, `bun`, or a cat (`pumpkin`, `shadow`, `snowball`, `smokey`, `mittens`) |
-| `style`, `cat`, `tone` | `style=cat&cat=smokey` | The same, spelled out (`style=bun`; `tone=midnight` is Fine's Midnight colors) |
-| `layout` | `layout=wide` | `normal` or `wide` |
-| `touchpad` | `touchpad=0` | Hide the touchpad |
-| `delay` | `delay=120` | Capture-card delay in ms (0–500) |
-| `deadzone` | `deadzone=0.08` | Ignore small stick movement (0–0.5) |
-| `demo=1` | | Start in test mode |
+No PS4? Plug in a controller and you're set.
+
+1. Keep the `native` folder next to PawPad (it came in the zip).
+2. Plug in or pair your controller, then open PawPad. It says `Controller connected: <name>`, and the Settings page shows the same.
+3. Done. **Source: Auto** uses the PS4 when it's sending and your computer's controller the rest of the time.
+
+Good to know:
+- Works with PlayStation, Xbox and Switch Pro controllers, by USB or Bluetooth.
+- The **touchpad can't be read** from a controller on your computer. The PS / Xbox / Guide button takes its place, so it still lights up and makes the Bun ears bounce.
+- Only the first controller is used for now (no multiple players yet).
+- The Xbox look has only been tested in Test mode. Windows and Linux are untested.
+- On a Mac, your browser may block the download. If so, open Terminal and run `xattr -dr com.apple.quarantine <the PawPad folder>` once.
 
 ## Test mode (no PS4 needed)
 
-Open `http://localhost:8080/` in a browser, open **Settings**, and switch on **Test mode**. A fake controller is sent to every connected page, **including OBS**, so you can position and size the overlay without the PS4. It stops when you switch it off or close that page.
+Go to **http://localhost:8080/**, open **Settings**, and turn on **Test mode**. A fake controller shows on every page, **including OBS**, so you can place and size the overlay. Turn it off when you're done.
 
 ## Troubleshooting
 
-The badge in the top-left of the settings page tells you where it's stuck:
+The badge at the top of the Settings page tells you what's wrong:
 
-| Badge | Meaning | Fix |
+| Badge | What it means | What to do |
 |---|---|---|
-| **Bridge offline** | The page can't reach the bridge | Start the bridge; check the URL and port |
-| **Waiting for PS4** | Bridge is up but no packets arrive | See below |
-| **PS4 live** | Everything works | |
+| **Bridge offline** | The page can't reach PawPad | Open PawPad, then check the link |
+| **Waiting for PS4** | PawPad is open but the PS4 isn't sending | See below |
+| **PS4 live** | All good | Nothing |
+| **Controller: <name>** | Showing a controller plugged into this computer | Nothing |
 
-**Waiting for PS4:**
-- The `ip` in `/data/GoldHEN/pad_stream.ini` must be your computer's *current* address. It changes if your router gives out new addresses; the bridge prints the right one on start.
-- PS4 and computer must be on the same network (not a guest Wi-Fi with client isolation).
-- Firewall: allow the bridge to receive **UDP port 9999**.
-- Restart the game after changing any plugin file.
-- Test the rest of the chain with Test mode first. If that works, the bridge and OBS are fine and the problem is on the PS4 side.
+**Still waiting for the PS4?**
+- The `ip` in `pad_stream.ini` must be your computer's **current** address. It can change, so check the address PawPad shows.
+- The PS4 and your computer must be on the **same network**. Guest Wi-Fi often blocks this.
+- Let PawPad through your firewall for **UDP port 9999**.
+- Restart the game after you change any plugin file.
+- Try **Test mode** first. If it works there, PawPad and OBS are fine and the problem is on the PS4 side.
 
-**"port already in use":** another copy of the bridge is running. Close it, or start with `--udp-port=<n>` / `--http-port=<n>` (and set the same port in `pad_stream.ini` and the OBS URL).
+**"Port already in use":** PawPad is already open somewhere. Close the other copy.
 
-**OBS shows nothing:** the bridge must be running before the source loads; then Refresh cache of current page.
+**OBS shows nothing:** open PawPad before you add the source, then right-click the source and choose **Refresh cache of current page**.
 
-## Bridge options
+---
 
-```
-bridge --http-port=8080 --udp-port=9999 --ps4-ip=192.168.1.50 --host=127.0.0.1
-```
+## For developers
 
-| Option | Default | Notes |
-|---|---|---|
-| `--http-port` | `8080` | Overlay page and WebSocket |
-| `--udp-port` | `9999` | Where the PS4 sends |
-| `--ps4-ip` | any | Only accept packets from this address |
-| `--host` | `127.0.0.1` | Set to `0.0.0.0` only if OBS runs on a *different* computer |
+Everything above is for players. If you want to build or change PawPad, see the notes below.
 
-## Security notes
-
-- The overlay is served on `127.0.0.1` only, and only pages served by the bridge itself can connect to its WebSocket.
-- UDP has no authentication. The bridge locks onto the first PS4 that sends valid packets and ignores other addresses until it goes quiet for 5 seconds. For a hard guarantee use `--ps4-ip`.
-- Don't expose the UDP port to the internet.
-
-## Building from source
+<details>
+<summary>Build and test commands</summary>
 
 ```bash
-# bridge (Node 22+)
+# run the bridge (Node 22+)
 cd mac-receiver && npm install && npm start
 
 # tests
-node mac-receiver/test/verify.js        # starts its own bridge: stop any running one first (ports 8080/9999)
+npm test --prefix mac-receiver
+node mac-receiver/test/verify.js   # stop any running bridge first (ports 8080/9999)
 
-# standalone executables + release zips (downloads Node binaries)
-bash scripts/build-release.sh           # output in dist/
+# release zips for Mac, Windows and Linux (output in dist/)
+bash scripts/build-release.sh
 
-# PS4 plugin (needs the OpenOrbis toolchain; edit paths at the top of the script)
+# PS4 plugin (needs the OpenOrbis toolchain)
 bash ps4-plugin/build_prx.sh
 
 # optional macOS menu-bar launcher
 bash mac-app/build.sh
 ```
 
-Layout:
+Project layout:
 
 ```
 ps4-plugin/     GoldHEN plugin (C, OpenOrbis)
-mac-receiver/   bridge: UDP in, HTTP + WebSocket out
-obs-overlay/    the overlay page (index.html + style.css settings UI, app.js client, retro.js canvas drawing)
+mac-receiver/   the bridge: receives PS4 data, serves the overlay
+obs-overlay/    the overlay page and settings
 mac-app/        optional macOS menu-bar launcher
 config/         example PS4 config files
 scripts/        release build
 ```
+
+Bridge options (advanced):
+
+| Option | Default | Notes |
+|---|---|---|
+| `--http-port` | `8080` | Overlay page and settings |
+| `--udp-port` | `9999` | Where the PS4 sends |
+| `--ps4-ip` | any | Only accept data from this address |
+| `--host` | `127.0.0.1` | Use `0.0.0.0` only if OBS runs on a different computer |
+| `--no-local` | off | Ignore controllers plugged into this computer |
+
+Security: the overlay is only reachable from this computer. UDP has no login, so use `--ps4-ip` for a hard lock on your PS4, and never expose the UDP port to the internet.
+
+</details>
+
+---
 
 ## License
 

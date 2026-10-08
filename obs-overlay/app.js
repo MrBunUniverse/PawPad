@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const config = { delayMs: 0, deadzone: 0.06 };
+  const config = { delayMs: 0, deadzone: 0.06, deviceKind: null };
   const stateQueue = []; // FIFO buffer that delays input to match capture-card lag
 
   const $ = (id) => document.getElementById(id);
@@ -24,6 +24,9 @@
   const toneRow = $('toneRow');
   const layoutInput = $('layoutInput');
   const padToggle = $('padToggle');
+  const padLabel = $('padLabel');
+  const controllerInput = $('controllerInput');
+  const sourceInput = $('sourceInput');
 
   // Segmented buttons mirror each <select data-seg>: the select stays the source of truth.
   const COAT_DOT = { pumpkin: '#d9822b', shadow: '#2b2b33', snowball: '#e6e6ee', smokey: '#7d8794', mittens: '#e3d2b2' };
@@ -51,11 +54,12 @@
   const syncSegs = () => segSelects.forEach((sel) => [...sel.seg.children].forEach((b) => b.setAttribute('aria-checked', b.dataset.v === sel.value)));
 
   // Status badge: bridge link, then whether the PS4 is actually sending.
-  const link = { bridge: false, ps4: false };
+  const link = { bridge: false, ps4: false, local: null, active: null };
   function showStatus() {
-    statusBadge.classList.toggle('connected', link.bridge && (link.ps4 || simulatorToggle.checked));
+    statusBadge.classList.toggle('connected', link.bridge && (link.ps4 || link.active === 'local' || simulatorToggle.checked));
     statusText.textContent = !link.bridge ? 'Bridge offline'
       : simulatorToggle.checked ? 'Test mode'
+      : link.active === 'local' ? `Controller: ${link.local.name}`
       : link.ps4 ? 'PS4 live' : 'Waiting for PS4';
   }
 
@@ -65,22 +69,27 @@
     delayVal.textContent = `${ms} ms`;
   }
 
-  function setStyle(name, coat, tone, layout, pad) {
-    config.style = ['fine', 'bun', 'cat'].includes(name) ? name : 'classic';
-    config.coat = [...coatInput.options].some(o => o.value === coat) ? coat : config.coat || 'pumpkin';
-    config.tone = tone === 'midnight' ? 'midnight' : 'default';
-    config.layout = layout === 'wide' ? 'wide' : 'normal';
-    layoutInput.value = config.layout;
-    config.pad = pad !== false && pad !== 'false' && pad !== '0';
-    padToggle.checked = config.pad;
-    styleInput.value = config.style;
-    coatInput.value = config.coat;
-    toneInput.value = config.tone;
+  // One look = style + coat/tone + layout + touchpad + controller type. applyLook merges a partial change and redraws.
+  // Controller type 'auto' follows the connected pad (PlayStation pads and "no pad" -> PlayStation look, anything else -> Xbox look).
+  const effectiveController = () => (config.controller !== 'auto' ? config.controller : ['playstation', null].includes(config.deviceKind) ? 'ps' : 'xbox');
+  function applyLook(patch) {
+    const l = { style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source, ...patch };
+    config.style = ['fine', 'bun', 'cat'].includes(l.style) ? l.style : 'classic';
+    config.coat = [...coatInput.options].some(o => o.value === l.coat) ? l.coat : config.coat || 'pumpkin';
+    config.tone = l.tone === 'midnight' ? 'midnight' : 'default';
+    config.layout = l.layout === 'wide' ? 'wide' : 'normal';
+    config.pad = l.pad !== false && l.pad !== 'false' && l.pad !== '0';
+    config.controller = ['ps', 'xbox'].includes(l.controller) ? l.controller : 'auto';
+    config.source = ['ps4', 'local'].includes(l.source) ? l.source : 'auto'; // bridge-side: which input to show
+    const ctrl = effectiveController();
+    styleInput.value = config.style; coatInput.value = config.coat; toneInput.value = config.tone;
+    layoutInput.value = config.layout; controllerInput.value = config.controller; sourceInput.value = config.source; padToggle.checked = config.pad;
     coatRow.hidden = config.style !== 'cat';
     toneRow.hidden = config.style !== 'fine';
+    padLabel.textContent = ctrl === 'xbox' ? 'Guide button' : 'Touchpad';
     syncSegs();
-    window.RetroPad.setStyle(config.style, config.coat, config.tone, config.layout, config.pad);
-    try { localStorage.setItem('padStyle', config.style); localStorage.setItem('padCoat', config.coat); localStorage.setItem('padTone', config.tone); localStorage.setItem('padLayout', config.layout); localStorage.setItem('padPad', config.pad); } catch (e) { /* storage blocked */ }
+    window.RetroPad.setStyle(config.style, config.coat, config.tone, config.layout, config.pad, ctrl);
+    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source']) localStorage.setItem('pad' + k[0].toUpperCase() + k.slice(1), config[k]); } catch (e) { /* storage blocked */ }
   }
 
   function setDeadzone(fraction) {
@@ -89,7 +98,7 @@
     deadzoneVal.textContent = `${Math.round(fraction * 100)}%`;
   }
 
-  // URL params: hideUI=1 (or obs), delay=0..500, deadzone=0..0.5, layout=normal|wide, touchpad=0, preset=classic|fine|bun|fine-midnight|pumpkin|shadow|snowball|smokey|mittens, style=classic|fine|bun|cat, cat=pumpkin|shadow|snowball|smokey|mittens, demo=1 (or sim=1).
+  // URL params: hideUI=1 (or obs), delay=0..500, deadzone=0..0.5, layout=normal|wide, touchpad=0, controller=auto|ps|xbox, preset=classic|fine|bun|fine-midnight|pumpkin|shadow|snowball|smokey|mittens, style=classic|fine|bun|cat, cat=pumpkin|shadow|snowball|smokey|mittens, demo=1 (or sim=1).
   // Any other param (e.g. an old theme=) is ignored.
   function parseUrlParams() {
     const params = new URLSearchParams(window.location.search);
@@ -105,32 +114,37 @@
     }
     setDelay(config.delayMs);
     setDeadzone(config.deadzone);
-    let saved = null, savedCoat = null, savedTone = null, savedLayout = null, savedPad = null;
-    try { saved = localStorage.getItem('padStyle'); savedCoat = localStorage.getItem('padCoat'); savedTone = localStorage.getItem('padTone'); savedLayout = localStorage.getItem('padLayout'); savedPad = localStorage.getItem('padPad'); } catch (e) { /* storage blocked */ }
+    const saved = {};
+    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source']) saved[k] = localStorage.getItem('pad' + k[0].toUpperCase() + k.slice(1)); } catch (e) { /* storage blocked */ }
     // ?preset=pumpkin (or classic / fine / bun) is a one-word shortcut; ?style= / ?cat= still work. Any of them pins this page.
     const preset = params.get('preset');
     const isCoat = (p) => [...coatInput.options].some(o => o.value === p);
     const fineMidnight = preset === 'fine-midnight';
     const urlStyle = preset ? (isCoat(preset) ? 'cat' : fineMidnight ? 'fine' : preset) : params.get('style');
-    const urlLayout = params.get('layout'), urlPad = params.get('touchpad');
-    config.pinned = !!(urlStyle || urlLayout || urlPad); // a URL-pinned page ignores the live look from the bridge
-    setStyle(urlStyle || saved, (isCoat(preset) ? preset : params.get('cat')) || savedCoat,
-      fineMidnight ? 'midnight' : (urlStyle ? params.get('tone') : savedTone), urlLayout || savedLayout, urlPad !== null ? urlPad : savedPad); // ?style= wins over the remembered choice
+    const urlLayout = params.get('layout'), urlPad = params.get('touchpad'), urlController = params.get('controller');
+    config.pinned = !!(urlStyle || urlLayout || urlPad || urlController); // a URL-pinned page ignores the live look from the bridge
+    applyLook({
+      style: urlStyle || saved.style,
+      coat: (isCoat(preset) ? preset : params.get('cat')) || saved.coat,
+      tone: fineMidnight ? 'midnight' : (urlStyle ? params.get('tone') : saved.tone),
+      layout: urlLayout || saved.layout,
+      pad: urlPad !== null ? urlPad : saved.pad,
+      controller: urlController || saved.controller,
+      source: saved.source
+    });
   }
 
   $('settingsToggleBtn').addEventListener('click', () => settingsPanel.classList.toggle('open'));
   $('closePanelBtn').addEventListener('click', () => settingsPanel.classList.remove('open'));
   delayInput.addEventListener('input', (e) => setDelay(parseInt(e.target.value, 10)));
-  styleInput.addEventListener('change', (e) => { setStyle(e.target.value, config.coat, config.tone, config.layout, config.pad); sendLook(); });
-  coatInput.addEventListener('change', (e) => { setStyle(config.style, e.target.value, config.tone, config.layout, config.pad); sendLook(); });
-  toneInput.addEventListener('change', (e) => { setStyle(config.style, config.coat, e.target.value, config.layout, config.pad); sendLook(); });
-  layoutInput.addEventListener('change', (e) => { setStyle(config.style, config.coat, config.tone, e.target.value, config.pad); sendLook(); });
-  padToggle.addEventListener('change', () => { setStyle(config.style, config.coat, config.tone, config.layout, padToggle.checked); sendLook(); });
+  // Every look control: apply the change here, then tell the bridge so OBS follows.
+  const bind = (el, key) => el.addEventListener('change', () => { applyLook({ [key]: el === padToggle ? el.checked : el.value }); sendLook(); });
+  [[styleInput, 'style'], [coatInput, 'coat'], [toneInput, 'tone'], [layoutInput, 'layout'], [padToggle, 'pad'], [controllerInput, 'controller'], [sourceInput, 'source']].forEach(([el, key]) => bind(el, key));
   deadzoneInput.addEventListener('input', (e) => setDeadzone(parseInt(e.target.value, 10) / 100));
   // Test mode runs on the bridge so every client (including OBS) receives it.
   // The chosen look lives on the bridge, so every page (OBS included) follows it with no URL changes.
   const sendLook = () => {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'look', style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad }));
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'look', style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source }));
   };
   const sendSim = () => {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'sim', on: simulatorToggle.checked }));
@@ -178,9 +192,13 @@
       if (data.type === 'welcome' && data.ips && data.ips.length) {
         $('detectedIp').textContent = `${data.ips.map(i => i.address).join(' or ')}:${data.udpPort || 9999}`;
       } else if (data.type === 'look') {
-        if (!config.pinned) setStyle(data.style, data.coat, data.tone, data.layout, data.pad);
+        if (!config.pinned) applyLook(data);
       } else if (data.type === 'status') {
         link.ps4 = !!data.ps4;
+        link.local = data.local || null;
+        link.active = data.active || null;
+        const kind = link.local ? link.local.kind : null;
+        if (kind !== config.deviceKind) { config.deviceKind = kind; applyLook({}); } // 'auto' controller type follows the pad
         showStatus();
       } else if (data.type === 'pad_state') {
         stateQueue.push({ localTime: performance.now(), state: data });

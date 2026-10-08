@@ -9,9 +9,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { WebSocketServer, WebSocket } = require('ws');
+const { createSources } = require('./sources');
+const { loadSdl, createLocalPad } = require('./local-pad');
 
 // ---------------------------------------------------------------
-// Options: --udp-port=9999 --http-port=8080 --host=127.0.0.1 --ps4-ip=192.168.1.50
+// Options: --udp-port=9999 --http-port=8080 --host=127.0.0.1 --ps4-ip=192.168.1.50 --no-local (skip local controllers)
 // (env UDP_PORT / HTTP_PORT / HTTP_HOST / PS4_IP work too)
 // ---------------------------------------------------------------
 const args = Object.fromEntries(
@@ -108,10 +110,8 @@ const wss = new WebSocketServer({
     }
 });
 
-let ps4Live = false;
 let simOwner = null;
 let simTimer = null;
-let lastPad = null; // newest forwarded pad state, so a freshly opened page starts correct
 let look = null; // last style chosen on the settings page; replayed to every OBS/browser client
 
 function send(ws, obj) {
@@ -126,19 +126,29 @@ function broadcast(obj) {
     }
 }
 
+// PS4 plugin vs a controller on this computer: PS4 first in 'auto' (the PS4 is the main use).
+const sources = createSources({ source: () => (look && look.source) || 'auto', send: broadcast });
+
 wss.on('connection', (ws) => {
     send(ws, { type: 'welcome', ips: localIpAddresses(), udpPort: UDP_PORT });
-    send(ws, { type: 'status', ps4: ps4Live });
+    send(ws, sources.status());
     if (look) send(ws, look);
-    if (lastPad && ps4Live) send(ws, lastPad);
+    const pad = sources.current(); // a freshly opened page starts with the current state
+    if (pad) send(ws, pad);
 
     ws.on('message', (raw) => {
         let m;
         try { m = JSON.parse(raw); } catch (e) { return; }
         if (m && m.type === 'look') {
             if (!['classic', 'fine', 'bun', 'cat'].includes(m.style) || !/^[a-z]{2,12}$/.test(m.coat)) return;
-            look = { type: 'look', style: m.style, coat: m.coat, tone: m.tone === 'midnight' ? 'midnight' : 'default', layout: m.layout === 'wide' ? 'wide' : 'normal', pad: m.pad !== false };
+            look = {
+                type: 'look', style: m.style, coat: m.coat, tone: m.tone === 'midnight' ? 'midnight' : 'default',
+                layout: m.layout === 'wide' ? 'wide' : 'normal', pad: m.pad !== false,
+                controller: ['ps', 'xbox'].includes(m.controller) ? m.controller : 'auto', // look of the pad: PlayStation / Xbox / follow the connected pad
+                source: ['ps4', 'local'].includes(m.source) ? m.source : 'auto'            // which input to show
+            };
             broadcast(look);
+            sources.refresh();
             return;
         }
         if (!m || m.type !== 'sim') return;
@@ -207,7 +217,7 @@ udp.on('message', (msg, rinfo) => {
 
     // The PS4 streams at a fixed rate even when nothing moves: forward changes only (still counts as "live").
     const state = msg.subarray(8);
-    if (lastState && state.equals(lastState)) return;
+    if (lastState && state.equals(lastState)) { sources.ps4Packet(null); return; }
     lastState = Buffer.from(state);
 
     const mask = msg.readUInt32LE(8);
@@ -215,7 +225,7 @@ udp.on('message', (msg, rinfo) => {
     for (const [name, bit] of Object.entries(BUTTON_MASKS)) buttons[name] = (mask & bit) !== 0;
     const axis = (i) => (msg[i] - 128) / 128;
 
-    broadcast(lastPad = {
+    sources.ps4Packet({
         type: 'pad_state',
         seq: msg.readUInt32LE(4),
         buttons,
@@ -237,12 +247,10 @@ let rate = 0;
 setInterval(() => {
     rate = packetCount;
     packetCount = 0;
-    const live = Date.now() - lastPacketTime < 2000;
-    if (live !== ps4Live) {
-        ps4Live = live;
-        broadcast({ type: 'status', ps4: live });
-    }
-    process.stdout.write(`\r[PS4] ${live ? `receiving ${rate} packets/s` : 'waiting for packets...'} | OBS/browser clients: ${wss.clients.size}      `);
+    sources.refresh(); // re-check which input is live (also notices the PS4 going quiet)
+    const live = sources.status().ps4;
+    const local = sources.status().local;
+    process.stdout.write(`\r[PS4] ${live ? `receiving ${rate} packets/s` : 'waiting for packets...'} | OBS/browser clients: ${wss.clients.size}${local ? ` | controller: ${local.name}` : ''}      `);
 }, 1000);
 
 server.on('error', (err) => {
@@ -272,8 +280,29 @@ udp.bind(UDP_PORT, '0.0.0.0', () => {
             console.log(`\nWARNING: the overlay is reachable from the network (--host=${HTTP_HOST}).`);
         }
         console.log('');
+        startLocalControllers();
     });
 });
+
+// Controllers plugged into this computer (optional: needs the SDL files next to the bridge or installed from npm).
+let localPad = null;
+function startLocalControllers() {
+    if (args['no-local']) { console.log('Local controllers: off (--no-local)\n'); return; }
+    const sdl = loadSdl([sea ? path.dirname(process.execPath) : __dirname]);
+    if (!sdl) { console.log('Local controllers: not available (PS4 only)\n'); return; }
+    try {
+        localPad = createLocalPad({
+            sdl,
+            buttonNames: Object.keys(BUTTON_MASKS),
+            onState: (pad) => sources.localState(pad),
+            onDevice: (dev) => { console.log(dev ? `\nController connected: ${dev.name}` : '\nController disconnected'); sources.setDevice(dev); },
+            log: (msg) => console.log(`\n[controller] ${msg}`)
+        });
+        console.log('Local controllers: ready\n');
+    } catch (e) {
+        console.log(`Local controllers: not available (${e.message})\n`);
+    }
+}
 
 process.on('SIGINT', () => { console.log('\nBye.'); process.exit(0); });
 process.on('SIGTERM', () => process.exit(0));

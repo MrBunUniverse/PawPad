@@ -1,11 +1,13 @@
 {
   "name": "pawpad-bridge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "PawPad bridge: PS4 controller UDP in, OBS overlay (HTTP + WebSocket) out",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test:sim": "node test/test-sender.js"
+    "test:sim": "node test/test-sender.js",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node test/verify.js"
   },
   "keywords": [
     "ps4",
@@ -19,5 +21,8 @@
   "license": "MIT",
   "dependencies": {
     "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "@kmamal/sdl": "^0.11.13"
   }
 }
