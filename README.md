@@ -4,7 +4,7 @@
 
 PawPad shows your PS4 controller inputs on stream as pixel-art buttons: pressed buttons light up (or squish), the sticks move, and L2/R2 show how hard you're pulling them (0–100). It has several looks, including a floppy-eared **Bun** and a cat-eared **Cat**, and a wide layout for games with a cramped HUD.
 
-![The PawPad looks: Classic, Fine, Fine Midnight, Bun, Cat and Bun wide](docs/looks.png)
+![PawPad: your PS4 controller, but cute. Shown in the Classic, Bun and Cat looks.](docs/looks.png)
 
 Most controller overlays read a pad plugged into your PC. PawPad reads it **on the console**: a GoldHEN plugin sends the inputs over your network, so it works when you play on the PS4 and capture with a capture card. (I couldn't find another tool that does this, but I may have missed one.)
 
