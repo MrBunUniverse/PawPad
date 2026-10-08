@@ -2,7 +2,7 @@
 
 **Your PS4 controller, but cute. Live in OBS.**
 
-PawPad shows your PS4 controller inputs on stream as pixel-art buttons: pressed buttons light up (or squish), the sticks move, and L2/R2 show how hard you're pulling them (0–100). It has several looks, including a floppy-eared **Bun** and a cat-eared **Cat**, and a wide layout for games with a cramped HUD.
+PawPad shows your PS4 controller inputs on stream as pixel-art buttons: pressed buttons light up (or squish), the sticks move, and L2/R2 show how hard you're pulling them (0–100). It has several looks, including a floppy-eared **Bun** and a cat-eared **Cat**, and a wide layout for games with a cramped HUD. It also works with a controller plugged into your own computer (PlayStation, Xbox or Switch Pro), and has a real **Xbox** look.
 
 ![PawPad: your PS4 controller, but cute. Shown in the Classic, Bun and Cat looks.](docs/looks.png)
 
@@ -14,7 +14,7 @@ PS4 (GoldHEN plugin)  --UDP-->  Bridge (this app, on your PC/Mac)  --WebSocket--
 
 ## What you need
 
-- A PS4 running **GoldHEN** (2.2 or newer).
+- A PS4 running **GoldHEN** (2.2 or newer), **or** just a controller plugged into your computer (see [step 5](#5-or-use-a-controller-plugged-into-your-computer)).
 - A computer on the **same network** as the PS4 running OBS Studio (macOS, Windows or Linux).
 - An FTP client to copy files to the PS4 (GoldHEN's FTP server listens on port **2121**).
 
@@ -77,11 +77,15 @@ Open `http://localhost:8080/` in a normal browser tab and use **Settings**. What
 
 | Setting | Options |
 |---|---|
+| **Controller** | **Auto** (follows the connected pad), **PlayStation**, or **Xbox**: the Xbox look has the staggered sticks, A/B/X/Y, LB/RB and LT/RT, View/Menu, and a round Guide button where the touchpad is |
 | **Style** | **Classic** (chunky pixels, the default), **Fine** (twice as many pixels: rounder corners, thinner outlines, segmented L2/R2 meter), **Bun** (Fine plus a cream bunny: floppy ears on a coral touchpad, pink bunny-paw sticks that squish when pressed, and ears that stay attached to the touchpad and give a tiny pixel "boing" when you push it down and again when you let go), **Cat** (Fine plus cat ears and paw-print sticks that squish when pressed) |
 | **Colors** (Fine) | **Default**, or **Midnight**, a dark palette without the animal extras |
 | **Which cat** (Cat) | Pumpkin (orange), Shadow (black), Snowball (white), Smokey (gray), Mittens (Siamese) |
 | **Layout** | **Normal**, or **Wide**: one short row with L2/L1 at the left end and R2/R1 at the right, for games with a cramped HUD |
-| **Touchpad** | Show or hide the touchpad block (the wide row closes the gap) |
+| **Touchpad** | Show or hide the touchpad block, or the Guide button on the Xbox look (the wide row closes the gap) |
+| **Source** | Which input to show: **Auto** (the PS4 while it's sending, otherwise a controller plugged into this computer), **PS4**, or **This computer** |
+
+![The Xbox look in Classic, Bun and Cat · Shadow](docs/xbox.png)
 
 The Browser Source stays **488 × 280** in every layout. The wide row is drawn at full width inside the same box and the space above and below it is transparent, so nothing needs resizing when you switch.
 
@@ -98,11 +102,27 @@ URL options pin that page to a value and ignore the live changes from Settings. 
 | `hideUI=1` | | Hides the status and settings (use this in OBS) |
 | `preset` | `preset=bun` | One-word look: `classic`, `fine`, `fine-midnight`, `bun`, or a cat (`pumpkin`, `shadow`, `snowball`, `smokey`, `mittens`) |
 | `style`, `cat`, `tone` | `style=cat&cat=smokey` | The same, spelled out (`style=bun`; `tone=midnight` is Fine's Midnight colors) |
+| `controller` | `controller=xbox` | `auto`, `ps` or `xbox` |
 | `layout` | `layout=wide` | `normal` or `wide` |
 | `touchpad` | `touchpad=0` | Hide the touchpad |
 | `delay` | `delay=120` | Capture-card delay in ms (0–500) |
 | `deadzone` | `deadzone=0.08` | Ignore small stick movement (0–0.5) |
 | `demo=1` | | Start in test mode |
+
+## 5. Or use a controller plugged into your computer
+
+New in 1.1: PawPad can show a controller that is connected to the computer running the bridge, so you don't need a PS4 at all. It works with PlayStation pads (DualShock 3/4, DualSense), Xbox pads (360, One, Series) and the Switch Pro controller, by USB or Bluetooth, on macOS, Windows and Linux.
+
+1. Keep the `native` folder that comes in the zip **next to the bridge** (it holds the controller-reading library).
+2. Plug in or pair the controller, then start the bridge. It prints `Controller connected: <name>`, and the badge on the settings page shows **Controller: <name>**.
+3. That's it. With **Source: Auto** the PS4 wins whenever it is sending, and your computer's controller is used the rest of the time. **Controller: Auto** picks the PlayStation look for PlayStation pads and the Xbox look for everything else; you can force either.
+
+Good to know:
+- **The touchpad isn't readable** from a controller on your computer, so the PlayStation touchpad block never lifts or clicks. The center button (PS / Xbox / Guide) is shown on the touchpad slot instead, so it presses the touchpad block, the Bun ears boing, or the Xbox Guide button lights up.
+- If the `native` folder is missing or can't load, the bridge says `Local controllers: not available (PS4 only)` and everything else works as before. `--no-local` turns it off on purpose.
+- On macOS, a download from the browser can be blocked by Gatekeeper. If so, run `xattr -dr com.apple.quarantine <the PawPad folder>` once. macOS may also ask for permission to read controller input the first time.
+- Only the first connected controller is used (no multiple players yet).
+- The Xbox look has been checked with Test mode only, and the Windows and Linux builds are untested.
 
 ## Test mode (no PS4 needed)
 
@@ -117,6 +137,7 @@ The badge in the top-left of the settings page tells you where it's stuck:
 | **Bridge offline** | The page can't reach the bridge | Start the bridge; check the URL and port |
 | **Waiting for PS4** | Bridge is up but no packets arrive | See below |
 | **PS4 live** | Everything works | |
+| **Controller: <name>** | A controller on this computer is being shown | |
 
 **Waiting for PS4:**
 - The `ip` in `/data/GoldHEN/pad_stream.ini` must be your computer's *current* address. It changes if your router gives out new addresses; the bridge prints the right one on start.
@@ -132,7 +153,7 @@ The badge in the top-left of the settings page tells you where it's stuck:
 ## Bridge options
 
 ```
-bridge --http-port=8080 --udp-port=9999 --ps4-ip=192.168.1.50 --host=127.0.0.1
+bridge --http-port=8080 --udp-port=9999 --ps4-ip=192.168.1.50 --host=127.0.0.1 --no-local
 ```
 
 | Option | Default | Notes |
@@ -141,6 +162,7 @@ bridge --http-port=8080 --udp-port=9999 --ps4-ip=192.168.1.50 --host=127.0.0.1
 | `--udp-port` | `9999` | Where the PS4 sends |
 | `--ps4-ip` | any | Only accept packets from this address |
 | `--host` | `127.0.0.1` | Set to `0.0.0.0` only if OBS runs on a *different* computer |
+| `--no-local` | off | Don't read controllers plugged into this computer |
 
 ## Security notes
 
@@ -155,7 +177,8 @@ bridge --http-port=8080 --udp-port=9999 --ps4-ip=192.168.1.50 --host=127.0.0.1
 cd mac-receiver && npm install && npm start
 
 # tests
-node mac-receiver/test/verify.js        # starts its own bridge: stop any running one first (ports 8080/9999)
+npm test --prefix mac-receiver     # unit tests: source selection, controller mapping
+node mac-receiver/test/verify.js        # end-to-end PS4 path; starts its own bridge: stop any running one first (ports 8080/9999)
 
 # standalone executables + release zips (downloads Node binaries)
 bash scripts/build-release.sh           # output in dist/
