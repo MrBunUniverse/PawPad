@@ -131,6 +131,29 @@
   const EAR_WIDE = makeEar([-0.5, -9], [-4.5, -4.5], 3.0, 2.1);
   // Xbox: the Guide button is small (a round head, not a wide pad), so the ears are small too.
   const EAR_SMALL = makeEar([-0.5, -5.5], [-4, -3], 1.9, 1.3);
+  // Xbox cat: two tilted triangle ears that rise out from behind the round Guide button (it is drawn on top of
+  // their bases), so they wrap around its upper corners instead of floating beside it. Left ear shown; the right one mirrors it.
+  const CAT_EAR_X = (() => {
+    const S = 0.5, cells = new Map();
+    const inTri = (px, py, a, b, c) => {
+      const d = (p, q, r) => (p[0] - r[0]) * (q[1] - r[1]) - (q[0] - r[0]) * (p[1] - r[1]);
+      const d1 = d([px, py], a, b), d2 = d([px, py], b, c), d3 = d([px, py], c, a);
+      return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+    };
+    const outer = [[-2.8, 0.5], [2.4, 0.5], [-3.4, -4.6]], inner = [[-1.5, 0], [1.2, 0], [-2.5, -3.2]];
+    for (let y = -6; y <= 1; y += S) for (let x = -5; x <= 4; x += S) {
+      if (!inTri(x + S / 2, y + S / 2, ...outer)) continue;
+      cells.set(x + ',' + y, inTri(x + S / 2, y + S / 2, ...inner) ? 'in' : 'fur');
+    }
+    const list = [...cells].map(([k, v]) => [...k.split(',').map(Number), v]);
+    const outline = new Set();
+    for (const [x, y] of list) for (const [dx, dy] of [[S, 0], [-S, 0], [0, S], [0, -S]]) {
+      const k = (x + dx) + ',' + (y + dy);
+      if (!cells.has(k)) outline.add(k);
+    }
+    return { list, outline: [...outline].map(k => k.split(',').map(Number)) };
+  })();
+
   // Touchpad press (finger down or button click): the ears pop up and settle in a few stepped frames.
   // Very small on purpose (a pixel or two): pushing down squashes the ears a hair, letting go pops them back up a hair.
   const BOING_DOWN = [0.95, 0.98, 1];      // vertical ear scale per frame
@@ -377,10 +400,10 @@
       if (xbox) {
         if (bun) ears(33, 4);
         if (cat) {
-          [75.5, 84.5].forEach(ex => { // at the two upper corners of the round "head", partly behind it
-            [[-P, 0], [P, 0], [0, -P], [0, P]].forEach(([dx, dy]) => sprite(EAR, ex + dx, 32.5 + dy, C.ink, true));
-            sprite(EAR, ex, 32.5, C.gray, true);
-            sprite(['##', '##', '##'], ex, 33.25, C.bean, true);
+          [[76.5, 1], [83.5, -1]].forEach(([ax, m]) => { // anchors sit inside the button's outline; the button covers the bases
+            const at = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(ax + (m < 0 ? -x - P : x), 35 + y, P, P); };
+            CAT_EAR_X.outline.forEach(([x, y]) => at(x, y, C.ink));
+            CAT_EAR_X.list.forEach(([x, y, v]) => at(x, y, v === 'in' ? C.bean : C.gray));
           });
         }
         guide(b.touchpad);
