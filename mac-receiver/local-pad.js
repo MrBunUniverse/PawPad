@@ -47,6 +47,8 @@ function mapPad(buttons = {}, axes = {}, buttonNames = Object.values(BUTTONS)) {
  * normal node_modules install when running from source. Returns null if none loads.
  */
 function loadSdl(baseDirs, log = () => {}) {
+    // SDL's video init makes this node process a Dock app; the bridge has no window, so keep it background-only.
+    process.env.SDL_MAC_BACKGROUND_APP = '1';
     const tries = [];
     for (const dir of baseDirs) tries.push(() => createRequire(path.join(dir, 'x.js'))(path.join(dir, 'native', 'sdl')));
     tries.push(() => createRequire(__filename)('@kmamal/sdl'));
