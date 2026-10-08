@@ -10,6 +10,8 @@ PawPad puts your controller on your stream as pixel-art buttons. Buttons light u
 - **Xbox look too:** it works with Xbox-style controllers.
 - **Play on PS4 or on your computer:** use a PS4 with a small plugin, or just plug a controller into your computer.
 
+**Setup guide:** download `docs/guide.html` and open it in your browser. It shows the four steps below in PawPad's pixel style.
+
 ![The Xbox look in Classic, Bun and Cat.](docs/xbox.png)
 
 ## What you need
