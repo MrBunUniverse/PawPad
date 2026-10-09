@@ -124,6 +124,8 @@ Good to know:
 
 Go to **http://localhost:8080/**, open **Settings**, and turn on **Test mode**. A fake controller shows on every page, **including OBS**, so you can place and size the overlay. Turn it off when you're done.
 
+**Button mash (preview)** sits under Test mode. It makes random button presses at random moments, some only a frame long, so you can watch the squish animation under busy input. It plays on the settings page only; turning it on also turns Test mode on.
+
 ## Troubleshooting
 
 The badge at the top of the Settings page tells you what's wrong:

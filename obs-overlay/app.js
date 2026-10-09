@@ -17,6 +17,7 @@
   const deadzoneInput = $('deadzoneInput');
   const deadzoneVal = $('deadzoneVal');
   const simulatorToggle = $('simulatorToggle');
+  const mashToggle = $('mashToggle');
   const styleInput = $('styleInput');
   const coatInput = $('coatInput');
   const coatRow = $('coatRow');
@@ -66,7 +67,7 @@
   function showStatus() {
     statusBadge.classList.toggle('connected', link.bridge && (link.ps4 || link.active === 'local' || simulatorToggle.checked));
     statusText.textContent = !link.bridge ? 'Bridge offline'
-      : simulatorToggle.checked ? 'Test mode'
+      : simulatorToggle.checked ? (mashToggle.checked ? 'Button mash' : 'Test mode')
       : link.active === 'local' ? `Controller: ${link.local.name}`
       : link.ps4 ? 'PS4 live' : 'Waiting for PS4';
   }
@@ -189,7 +190,34 @@
   const sendSim = () => {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'sim', on: simulatorToggle.checked }));
   };
-  simulatorToggle.addEventListener('change', () => { sendSim(); showStatus(); });
+  simulatorToggle.addEventListener('change', () => {
+    if (!simulatorToggle.checked) { mashToggle.checked = false; setMash(false); }
+    sendSim(); showStatus();
+  });
+
+  // Button mash (preview only): this page makes its own random presses at random moments, some only one frame long, so the
+  // squish gets busy input. Turning it on also turns Test mode on, and while it runs this page ignores the bridge's test pattern.
+  const MASH_BUTTONS = ['cross', 'circle', 'triangle', 'square', 'l1', 'r1', 'l3', 'r3', 'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right', 'share', 'options', 'touchpad'];
+  const mashLeft = {}; // button -> ticks it is still pressed
+  let mashTimer = null;
+  function mashTick() {
+    if (Math.random() < 0.25) { // about 15 presses a second on the 60 Hz tick
+      const free = MASH_BUTTONS.filter((n) => !mashLeft[n]);
+      if (free.length) mashLeft[free[Math.floor(Math.random() * free.length)]] = 1 + Math.floor(Math.random() * 8); // held 1 to 8 ticks
+    }
+    const buttons = {};
+    for (const n of MASH_BUTTONS) { buttons[n] = mashLeft[n] > 0; if (mashLeft[n] > 0) mashLeft[n]--; }
+    stateQueue.push({ localTime: performance.now(), state: { type: 'pad_state', buttons, axes: {}, triggers: {}, touch: { active: false } } });
+    if (stateQueue.length > 600) stateQueue.shift();
+  }
+  function setMash(on) {
+    if (on && !mashTimer) mashTimer = setInterval(mashTick, 16);
+    if (!on && mashTimer) { clearInterval(mashTimer); mashTimer = null; MASH_BUTTONS.forEach((n) => { mashLeft[n] = 0; }); }
+  }
+  mashToggle.addEventListener('change', () => {
+    if (mashToggle.checked && !simulatorToggle.checked) { simulatorToggle.checked = true; sendSim(); }
+    setMash(mashToggle.checked); showStatus();
+  });
 
   // Radial deadzone with rescaling so the stick still reaches +/-1.
   function applyDeadzone(x, y, deadzone) {
@@ -250,6 +278,7 @@
         if (kind !== config.deviceKind) { config.deviceKind = kind; applyLook({}); } // 'auto' controller type follows the pad
         showStatus();
       } else if (data.type === 'pad_state') {
+        if (mashTimer) return; // the bridge's test pattern would fight the button mash on this page
         stateQueue.push({ localTime: performance.now(), state: data });
         if (stateQueue.length > 600) stateQueue.shift(); // frames stop while the source is hidden: don't grow forever
       }
