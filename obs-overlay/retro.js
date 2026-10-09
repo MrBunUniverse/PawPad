@@ -2,7 +2,8 @@
  * Pixel-art controller, drawn rect by rect on a canvas (no images, no smoothing).
  * Looks: classic / fine (2x denser grid) / cat; layouts: normal / wide.
  * Every button has two states (idle / pressed); L2 and R2 show analog pressure
- * as a bar meter plus a 0-100 readout. Entry points: RetroPad.setStyle(...) and RetroPad.draw(state, leftStick, rightStick).
+ * as a bar meter plus a 0-100 readout (level), or as a button that squeezes down (squeeze).
+ * Entry points: RetroPad.setStyle(...) and RetroPad.draw(state, leftStick, rightStick).
  */
 (function () {
   'use strict';
@@ -200,12 +201,13 @@
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   // P = size of one drawn pixel in logical units: 1 = classic, 0.5 = fine (2x denser grid).
-  let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false;
-  function setStyle(name, coat, tone, layout, pad, controller) {
+  let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false, squeeze = false;
+  function setStyle(name, coat, tone, layout, pad, controller, triggerLook) {
     ({ W, H, OX, OY, g: G } = LAYOUTS[layout] || LAYOUTS.normal);
     showPad = pad !== false;
     wideLayout = layout === 'wide';
     xbox = controller === 'xbox';
+    squeeze = triggerLook === 'squeeze';
     if (xbox) { G = wideLayout ? XBOX.wide.g : XBOX.normal; if (wideLayout) W = XBOX.wide.W; }
     if (!showPad && wideLayout) { // wide row: close the gap the touchpad / Guide button leaves
       const gap = xbox ? GAP.xbox : GAP.ps;
@@ -301,6 +303,11 @@
   const meterColor = f => (f < 0.34 ? C.m1 : f < 0.67 ? C.m2 : C.m3);
 
   function trigger(x, frac) {
+    if (squeeze) { // no meter or readout: the button sinks down and gets shorter as it is pulled (bottom edge stays put)
+      const s = Math.round(frac * 5);
+      box(x, 2 + s, 22, 14 - s, C.gray, C.grayHi, C.grayLo);
+      return;
+    }
     box(x, 2, 22, 14, C.gray, C.grayHi, C.grayLo);
     rect(x + 2, 4, 6, 10, C.empty);
     if (P < 1) { // fine: 5 chunky segments with gaps instead of a continuous bar

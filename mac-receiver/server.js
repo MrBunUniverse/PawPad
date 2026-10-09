@@ -147,7 +147,8 @@ wss.on('connection', (ws) => {
                 controller: ['ps', 'xbox'].includes(m.controller) ? m.controller : 'auto', // look of the pad: PlayStation / Xbox / follow the connected pad
                 source: ['ps4', 'local'].includes(m.source) ? m.source : 'auto',           // which input to show
                 shadow: Math.min(100, Math.max(0, Math.round(Number(m.shadow) || 0))),     // drop shadow strength, 0 = off
-                fps: Math.min(60, Math.max(5, Math.round(Number(m.fps) || 60)))            // overlay frame-rate cap, 5-60
+                fps: Math.min(60, Math.max(5, Math.round(Number(m.fps) || 60))),           // overlay frame-rate cap, 5-60
+                trigger: m.trigger === 'squeeze' ? 'squeeze' : 'level'                     // L2/R2 look: level meter or squeeze
             };
             broadcast(look);
             sources.refresh();
