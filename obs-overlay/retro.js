@@ -333,6 +333,16 @@
       for (let x = 0; x < row.length; x++) if (row[x] === '#') ctx.fillRect(ox + x * P, oy + y * P, P, P);
     });
   };
+  // The same sprite squashed to a fraction s of its height (rows picked evenly), so a symbol fits a flattened button.
+  const spriteSquash = (rows, cx, cy, c, s, raw) => {
+    const src = P < 1 && !raw ? fine(rows) : rows, T = Math.max(1, Math.round(src.length * s));
+    ctx.fillStyle = c;
+    const ox = raw ? cx - rows[0].length * P / 2 : cx - (rows[0].length >> 1), oy = cy - T * P / 2;
+    for (let t = 0; t < T; t++) {
+      const row = src[Math.min(src.length - 1, Math.floor((t + 0.5) * src.length / T))];
+      for (let x = 0; x < row.length; x++) if (row[x] === '#') ctx.fillRect(ox + x * P, oy + t * P, P, P);
+    }
+  };
   // Outlined box with cut corners, light top row and dark bottom row.
   const box = (x, y, w, h, fill, hi, lo) => {
     const ins = P < 1 ? [1, 0.5] : [1]; // corner steps: fine mode gets a rounder corner
@@ -489,9 +499,11 @@
     if (xbox) color = XBOX_COLOUR()[name];
     ballSq(cx, cy, 5, on ? color : C.gray, on ? C.white : C.grayHi, on ? C.ink : C.grayLo, p);
     const ink = on ? C.white : color;
-    if (xbox) sprite(LETTERS[name], cx, cy, ink);
-    else if (P < 1) sprite(FINE_SYMBOLS[name], cx, cy + (name === 'triangle' ? -1 : 0), ink, true); // triangle nudged up so its centre of mass sits on the button centre
-    else sprite(SPRITES[name], cx, cy, ink);
+    const k = squishFx ? sn(p * 1.5) : 0; // the same squash ballSq gives the body, so the symbol shrinks with it
+    const symbol = (rows, y, raw) => (k ? spriteSquash(rows, cx, y, ink, 1 - k / 5, raw) : sprite(rows, cx, y, ink, raw));
+    if (xbox) symbol(LETTERS[name], cy, false);
+    else if (P < 1) symbol(FINE_SYMBOLS[name], cy + (name === 'triangle' ? -1 : 0), true); // triangle nudged up so its centre of mass sits on the button centre
+    else symbol(SPRITES[name], cy, false);
   }
 
   function draw(state, left, right) {
