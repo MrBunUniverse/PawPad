@@ -40,6 +40,13 @@
     pad: null, padHi: null, padLo: null, blush: '#f2a39a', earIn: '#f0c4b8'
   };
   const BASE = { ...C };
+  // Colour themes: they override the palette of the current look. "default" keeps the look's own colours.
+  const THEMES = {
+    default: {},
+    contrast: { gray: '#4a4a4a', grayHi: '#ffffff', grayLo: '#000000', ink: '#000000', text: '#ffffff', dim: '#e0e0e0', empty: '#000000', on: '#ffe600', onHi: '#ffffff', onLo: '#000000', brown: '#000000', pad: '#7a7a7a', padHi: '#ffffff', padLo: '#000000' },
+    night: { gray: '#262a48', grayHi: '#4a5088', grayLo: '#10132a', ink: '#05060f', text: '#c8d0ff', dim: '#7f88c0', empty: '#0b0d1f', on: '#6f9bff', onHi: '#c5d6ff', onLo: '#2c4aa0', brown: '#2c4aa0', pad: '#3a4170', padHi: '#5762a8', padLo: '#171b35' },
+    pastel: { gray: '#ece6f7', grayHi: '#ffffff', grayLo: '#bfb4dc', ink: '#5a4a7a', text: '#5a4a7a', dim: '#9d90bd', empty: '#d8cfee', on: '#ffc9de', onHi: '#ffffff', onLo: '#e89ab8', brown: '#e89ab8', pad: '#ffd9b3', padHi: '#fff0e0', padLo: '#e7b58a' }
+  };
   // Cat preset coats: body = gray parts of the pad; cap = stick cap (defaults to body); bean = paw pads.
   const COATS = {
     pumpkin: { gray: '#d9822b', grayHi: '#f5b061', grayLo: '#8f4a12', bean: '#ffb3c1' },
@@ -179,6 +186,7 @@
     return boingStart && i < boingSeq.length ? i : -1;
   };
   function startBoing(seq) {
+    if (calm) return;
     boingSeq = seq;
     boingStart = performance.now();
     if (boingTimer) return;
@@ -194,12 +202,13 @@
   let foldTimer = null;
   function foldAngle(side) {
     const f = folds[side];
-    if (!f) return 0;
+    if (!f || calm) return 0;
     const i = Math.floor((performance.now() - f.start) / 50);
     return i < f.seq.length ? f.seq[i] : f.hold;
   }
   function fold(side, spec) {
-    folds[side] = { seq: spec.seq, hold: spec.hold, start: performance.now() };
+    if (calm) return;
+    folds[side] ={ seq: spec.seq, hold: spec.hold, start: performance.now() };
     if (foldTimer) return;
     foldTimer = setInterval(() => {
       const moving = ['left', 'right'].some((s) => folds[s] && Math.floor((performance.now() - folds[s].start) / 50) < folds[s].seq.length);
@@ -257,7 +266,9 @@
   const ctx = canvas.getContext('2d');
   // P = size of one drawn pixel in logical units: 1 = classic, 0.5 = fine (2x denser grid).
   let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false, squeeze = false, bulgeFx = false, squishFx = false, nameOn = true;
-  function setStyle(name, coat, tone, layout, pad, controller, triggerLook, bulge, squish, names) {
+  let calm = false, trail = false; // calm: no motion at all; trail: faint dots behind each stick cap
+  const trails = { ls: [], rs: [] };
+  function setStyle(name, coat, tone, layout, pad, controller, triggerLook, bulge, squish, names, opts = {}) {
     ({ W, H, OX, OY, g: G } = LAYOUTS[layout] || LAYOUTS.normal);
     showPad = pad !== false;
     wideLayout = layout === 'wide';
@@ -273,13 +284,14 @@
     cat = name === 'cat';
     bun = name === 'bun';
     const stylised = cat || bun; // only Bun and Cat take the bulge and squish effects; Classic and Fine never do
-    bulgeFx = stylised && bulge !== false;
-    squishFx = stylised && squish === true;
+    calm = !!opts.calm; trail = !!opts.trail;
+    bulgeFx = stylised && bulge !== false && !calm;
+    squishFx = stylised && squish === true && !calm;
     nameOn = names !== false;
     if (bun && wideLayout) { OY -= 4; H += 4; } // headroom for the ears in the one-row layout
     themed = cat || bun || (name === 'fine' && tone === 'midnight'); // fine + midnight: the black-cat colours without the cat extras
     P = name === 'fine' || cat || bun ? 0.5 : 1;
-    Object.assign(C, BASE, cat ? COATS[coat] || COATS.pumpkin : bun ? BUN : themed ? COATS.shadow : {});
+    Object.assign(C, BASE, cat ? COATS[coat] || COATS.pumpkin : bun ? BUN : themed ? COATS.shadow : {}, THEMES[opts.theme] || {});
     if (!C.capFill) { C.capFill = C.gray; C.capHi = C.grayHi; C.capLo = C.grayLo; }
     if (!C.dim) C.dim = C.grayHi;
     const k = 1 / P;
@@ -486,9 +498,15 @@
     if (P < 1) sprite(ARROWS[dir], sn(g.x + g.w / 2), sn(g.y + g.h / 2), on ? C.brown : C.grayHi, true);
   }
 
-  function stick(cx, cy, v, pressed, p) {
+  function stick(cx, cy, v, pressed, p, key) {
     disc(cx, cy, 11, C.ink, true); disc(cx, cy, 10, C.grayLo, true);
     const tx = cx + Math.round(v.x * 4), ty = cy + Math.round(v.y * 4) + (pressed ? 1 : 0);
+    if (trail) { // faint dots where the cap has been, fading with age
+      const h = trails[key];
+      h.push([tx, ty]); if (h.length > 8) h.shift();
+      h.forEach(([x, y], i) => { ctx.globalAlpha = (i + 1) / (h.length + 1) * 0.5; rect(x, y, P, P, C.dim); });
+      ctx.globalAlpha = 1;
+    }
     if (cat) { // no light-up: the cap keeps its coat and the paw squishes instead
       ballSq(tx, ty, 6, C.capFill, C.capHi, C.capLo, p, true, 0.5);
       const paw = pressed ? PAW_SQUISH : PAW, py = ty + (pressed ? 0.5 : 0);
@@ -596,8 +614,8 @@
       arm(40, 43, 8, 7, b.dpad_right, 'right', sqp('dpad_right'));
     });
 
-    at('ls', () => stick(62, 56, left, b.l3, sqp('l3')));
-    at('rs', () => stick(98, 56, right, b.r3, sqp('r3')));
+    at('ls', () => stick(62, 56, left, b.l3, sqp('l3'), 'ls'));
+    at('rs', () => stick(98, 56, right, b.r3, sqp('r3'), 'rs'));
 
     at('face', () => {
       face('triangle', 124, 36, C.tri, b.triangle, sqp('triangle'));
