@@ -394,11 +394,14 @@
     const now = performance.now();
     if (buttons) for (const n of SQ_BUTTONS) if (buttons[n]) sq[n].until = now + SQ_HOLD;
   }
-  // Box squash: shorter from the top with the bottom edge fixed (taller below 0), and wider on each side by the same amount.
+  // Box squash geometry: shorter from the top with the bottom edge fixed (taller below 0), and wider on each side by the same amount.
+  const squashed = (x, y, w, h, p) => {
+    const dh = Math.min(sn(2 * p), h - 3), bl = squishFx ? sn(p) : 0;
+    return { x: x - bl, y: y + dh, w: w + 2 * bl, h: h - dh };
+  };
   const pBox = (x, y, w, h, fill, hi, lo, p) => {
-    const dh = Math.min(sn(2 * p), h - 3), bl = sn(p);
-    if (!squishFx || (!dh && !bl)) return box(x, y, w, h, fill, hi, lo);
-    box(x - bl, y + dh, w + 2 * bl, h - dh, fill, hi, lo);
+    const g = squashed(x, y, w, h, p);
+    box(g.x, g.y, g.w, g.h, fill, hi, lo);
   };
   // Filled oval, built row by row on the P grid (used for squashed round buttons).
   const oval = (cx, cy, rx, ry, c) => {
@@ -453,8 +456,10 @@
     left: ['..#', '.##', '###', '.##', '..#'], right: ['#..', '##.', '###', '##.', '#..']
   };
   function arm(x, y, w, h, on, dir, p) {
-    pBox(x, y + (on ? 1 : 0), w, h, on ? C.on : C.white, on ? C.onHi : C.white, on ? C.onLo : C.grayHi, p);
-    if (P < 1) sprite(ARROWS[dir], x + w / 2, y + h / 2 + (on ? 1 : 0), on ? C.brown : C.grayHi, true);
+    const g = squashed(x, y + (on ? 1 : 0), w, h, p);
+    box(g.x, g.y, g.w, g.h, on ? C.on : C.white, on ? C.onHi : C.white, on ? C.onLo : C.grayHi);
+    // The arrow is centred on the squashed arm, on the pixel grid, so it moves and bulges with the arm.
+    if (P < 1) sprite(ARROWS[dir], sn(g.x + g.w / 2), sn(g.y + g.h / 2), on ? C.brown : C.grayHi, true);
   }
 
   function stick(cx, cy, v, pressed, p) {
