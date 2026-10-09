@@ -102,7 +102,7 @@ const server = http.createServer((req, res) => {
 // ---------------------------------------------------------------
 const wss = new WebSocketServer({
     server,
-    maxPayload: 256,
+    maxPayload: 4096, // a whole look is a few hundred bytes; the cap only stops absurdly large messages
     // Only pages served by this bridge may connect (blocks other websites from reading your input).
     verifyClient: ({ origin, req }) => {
         if (!origin) return true; // non-browser clients
@@ -141,8 +141,9 @@ wss.on('connection', (ws) => {
         try { m = JSON.parse(raw); } catch (e) { return; }
         if (m && m.type === 'look') {
             if (!['classic', 'fine', 'bun', 'cat'].includes(m.style) || !/^[a-z]{2,12}$/.test(m.coat)) return;
+            // Unknown look fields pass through, so a new switch needs no bridge change to reach OBS.
             look = {
-                ...m, type: 'look', style: m.style, coat: m.coat, // unknown look fields pass through, so new switches need no bridge change tone: m.tone === 'midnight' ? 'midnight' : 'default',
+                ...m, type: 'look', style: m.style, coat: m.coat, tone: m.tone === 'midnight' ? 'midnight' : 'default',
                 layout: m.layout === 'wide' ? 'wide' : 'normal', pad: m.pad !== false,
                 controller: ['ps', 'xbox'].includes(m.controller) ? m.controller : 'auto', // look of the pad: PlayStation / Xbox / follow the connected pad
                 source: ['ps4', 'local'].includes(m.source) ? m.source : 'auto',           // which input to show
