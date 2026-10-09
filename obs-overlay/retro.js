@@ -355,7 +355,7 @@
 
   function trigger(x, frac) {
     if (squeeze) { // no meter or readout: the button sinks down and gets shorter as it is pulled (bottom edge stays put)
-      const s = Math.round(frac * 5);
+      const s = Math.round(frac * 10); // up to 10 px: the button ends 4 px tall (3 would merge the highlight and shadow rows)
       box(x, 2 + s, 22, 14 - s, C.gray, C.grayHi, C.grayLo);
       return;
     }
