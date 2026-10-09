@@ -426,22 +426,29 @@
 
   const meterColor = f => (f < 0.34 ? C.m1 : f < 0.67 ? C.m2 : C.m3);
 
-  // A button name (3x5 glyphs, 1-unit cells and gaps) with its top-left corner at (x, y).
-  const nameText = (text, x, y, c) => {
+  // A button name: 3x5 letters on the style's pixel grid (half size in Bun and Cat), centred on cy. Fewer rows squeeze it
+  // into thin horizontal lines, down to one, which is how a name follows a squeezed trigger.
+  const nameWidth = text => (text.length * 4 - 1) * P;
+  const nameText = (text, left, cy, c, rows = 5) => {
     ctx.fillStyle = c;
-    x = Math.round(x); y = Math.round(y); // whole units, or the letters blur
-    [...text].forEach((ch, i) => nameGlyph(ch).forEach((row, r) => {
-      for (let k = 0; k < row.length; k++) if (row[k] === '#') ctx.fillRect(x + i * 4 + k, y + r, 1, 1);
-    }));
+    const x0 = sn(left), top = sn(cy - rows * P / 2);
+    const pick = Array.from({ length: rows }, (_, t) => Math.floor((t + 0.5) * 5 / rows)); // which glyph rows are kept
+    [...text].forEach((ch, i) => {
+      const glyph = nameGlyph(ch);
+      pick.forEach((src, t) => {
+        const row = glyph[src];
+        for (let k = 0; k < row.length; k++) if (row[k] === '#') ctx.fillRect(x0 + (i * 4 + k) * P, top + t * P, P, P);
+      });
+    });
   };
-  const nameWidth = text => text.length * 4 - 1;
 
   function trigger(x, frac, name) {
     if (squeeze) { // no meter or readout: the button sinks down and gets shorter as it is pulled (bottom edge stays put)
       const s = Math.round(frac * 10); // up to 10 px: the button ends 4 px tall (3 would merge the highlight and shadow rows)
       const w = bulgeFx ? Math.round(frac) : 0; // past half pull the button bulges 1 px out on each side, like a squeezed ball (1 px is all the wide layout has room for)
       box(x - w, 2 + s, 22 + 2 * w, 14 - s, C.gray, C.grayHi, C.grayLo);
-      if (nameOn && s <= 5) nameText(name, x + 8, Math.round(6.5 + s / 2), C.text); // the name is centred in the box; it hides once the box is too short to hold it
+      // The name is centred in the box and squeezes with it: rows drop out as the box shortens, down to one line.
+      if (nameOn) nameText(name, x + (22 - nameWidth(name)) / 2, 9 + s / 2, C.text, Math.max(1, Math.round(5 * (14 - s) / 14)));
       return;
     }
     box(x, 2, 22, 14, C.gray, C.grayHi, C.grayLo);
@@ -460,8 +467,8 @@
 
   function bumper(x, on, p, name) {
     pBox(x, 19 + (on ? 1 : 0), 22, 7, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, p);
-    const g = squashed(x, 19 + (on ? 1 : 0), 22, 7, p); // the name shows only while the bumper is whole: 5 rows of letters do not fit a squashed one
-    if (nameOn && g.h >= 7) nameText(name, Math.round(g.x + (g.w - nameWidth(name)) / 2), g.y + 1, on ? C.ink : C.text);
+    const g = squashed(x, 19 + (on ? 1 : 0), 22, 7, p); // the name stays centred on the squashed bumper
+    if (nameOn) nameText(name, g.x + (g.w - nameWidth(name)) / 2, g.y + g.h / 2, on ? C.ink : C.text);
   }
 
   function pill(x, y, on, p) {
