@@ -96,6 +96,14 @@ In a web browser, go to **http://localhost:8080/** and open **Settings**. Your c
 | **Squeeze triggers** | **Off** (the default) shows L2 and R2 as a level meter with a 0-100 readout. **On** drops the meter and number: the button sinks and shrinks as you pull it |
 | **Trigger bulge** | With **Squeeze triggers** on, a pulled trigger also bulges out a little, like a squeezed ball. Bun and Cat only. On by default |
 | **Squish buttons** | Every button squishes and bulges a little when pressed. Bun and Cat only. Off by default |
+| **Theme** | Colour themes for the controller: Default, High contrast, Night or Pastel |
+| **Calm mode** | Stops all motion: no bounce, wobble, ear folds or trigger bulge. Shapes still change. Good for viewers who get overstimulated |
+| **Auto-hide when idle** | Fades the controller out after 8 seconds with no input, and brings it back on the next press |
+| **Input history** | Shows the last four buttons pressed, in the corner of the overlay |
+| **Stick trail** | Faint dots that trail each stick cap as it moves |
+| **Advanced settings** | Shows the rarer rows (shadow, frame rate, capture delay, stick deadzone, bulge and squish). Off by default; this browser remembers the choice |
+| **Presets, export and reset** | Save named looks, export and import a look as a JSON file, or reset everything to the defaults. **Copy look URL** makes a link that pins one OBS scene to one look |
+| **Signal** | Shows packets per second from the bridge, time since the last packet, and presses per second |
 | **Button names** | Names the triggers and bumpers: LT / RT and LB / RB on the Xbox look, L2 / R2 and L1 / R1 on the PlayStation look. Triggers show their name in Squeeze mode only, since the level meter fills their box. On by default |
 | **Source** | **Auto** (the PS4 when it's sending, otherwise your computer's controller), **PS4**, or **This computer** |
 
