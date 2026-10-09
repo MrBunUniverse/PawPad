@@ -148,6 +148,7 @@ wss.on('connection', (ws) => {
                 source: ['ps4', 'local'].includes(m.source) ? m.source : 'auto',           // which input to show
                 shadow: Math.min(100, Math.max(0, Math.round(Number(m.shadow) || 0))),     // drop shadow strength, 0 = off
                 fps: Math.min(60, Math.max(5, Math.round(Number(m.fps) || 60))),           // overlay frame-rate cap, 5-60
+                opacity: m.opacity == null ? 100 : Math.min(100, Math.max(10, Math.round(Number(m.opacity) || 100))), // controller opacity, 10-100%
                 trigger: m.trigger === 'squeeze' ? 'squeeze' : 'level',                    // L2/R2 look: level meter or squeeze
                 bulge: m.bulge !== false,                                                  // Bun / Cat: squeezed triggers bulge (on by default)
                 squish: m.squish === true,                                                 // Bun / Cat: pressed buttons squish and bulge (off by default)
