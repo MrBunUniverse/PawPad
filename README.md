@@ -85,7 +85,7 @@ In a web browser, go to **http://localhost:8080/** and open **Settings**. Your c
 | Setting | What it does |
 |---|---|
 | **Controller** | **Auto** picks the right controller for what you plug in. You can also choose **PlayStation** or **Xbox** |
-| **Style** | **Classic** (chunky pixels, the default). **Fine** (smoother and sharper). **Bun** (a cute bunny with ears that bounce when you press the touchpad). **Cat** (cat ears and paw-print sticks) |
+| **Style** | **Classic** (chunky pixels, the default). **Fine** (smoother and sharper). **Bun** (a cute bunny with ears that bounce when you press the touchpad, and fold down on the side of the bumper you press: L1 for the left ear, R1 for the right). **Cat** (cat ears that fold down with the bumper on their side, and paw-print sticks) |
 | **Colors** | For Fine: **Default**, or **Midnight** (dark) |
 | **Which cat** | For Cat: Pumpkin, Shadow, Snowball, Smokey or Mittens |
 | **Layout** | **Normal**, or **Wide** (one short row, handy when a game's HUD is in the way) |

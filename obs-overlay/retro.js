@@ -158,12 +158,10 @@
   // PlayStation, touchpad pressed: the same ears, shorter and bent down and out.
   const CAT_EAR_PS_DOWN = catEarShape([[-3.6, 0.5], [3.0, 0.5], [-5.6, -3.5]], [[-3.2, 0], [-0.6, 0], [-4.6, -2.8]]);
 
-  // Cat ears: anchors [x, mirror] on row y. The Xbox Guide uses CAT_EAR_X; the PlayStation pad passes its own shape.
-  const catEars = (anchors, y, shape = CAT_EAR_X) => anchors.forEach(([ax, m]) => {
-    const at = (x, yy, c) => { ctx.fillStyle = c; ctx.fillRect(ax + (m < 0 ? -x - P : x), y + yy, P, P); };
-    shape.outline.forEach(([x, yy]) => at(x, yy, C.ink));
-    shape.list.forEach(([x, yy, v]) => at(x, yy, v === 'in' ? C.bean : C.gray));
-  });
+  // Cat ears: anchors [x, mirror] on row y. The first anchor is the left ear, the second the right one, and each folds with its bumper.
+  // The Xbox Guide uses CAT_EAR_X; the PlayStation pad passes its own shape.
+  const catEars = (anchors, y, shape = CAT_EAR_X) => anchors.forEach(([ax, m], i) =>
+    drawEar(shape, ax, y, m, foldAngle(i === 0 ? 'left' : 'right'), 1, { ink: C.ink, out: C.gray, in: C.bean }));
 
   // Touchpad press (finger down or button click): the ears pop up and settle in a few stepped frames.
   // Very small on purpose (a pixel or two): pushing down squashes the ears a hair, letting go pops them back up a hair.
@@ -171,6 +169,7 @@
   const BOING_UP = [1.05, 1.02, 0.99, 1];
   const BOING_MS = 50;
   let boingSeq = BOING_UP, boingStart = 0, boingTimer = null, prevClick = false, prevTouch = false;
+  let prevL1 = false, prevR1 = false; // bumper edges, for the ear folds
   const boingFrame = () => {
     const i = Math.floor((performance.now() - boingStart) / BOING_MS);
     return boingStart && i < boingSeq.length ? i : -1;
@@ -184,17 +183,69 @@
       draw(...last); // the frame index is part of the repaint key, so a new frame always redraws
     }, 30);
   }
+  // Ear fold: each ear folds about its base, the tip falling outward and down, as PawKey's mouse ears do. L1 folds the left
+  // ear and R1 the right one. The ear stays folded while the bumper is held and springs back on release.
+  const FOLD_PRESS = { seq: [0.1, 0.27, 0.2], hold: 0.2 }, FOLD_RELEASE = { seq: [0.12, -0.05, 0.02], hold: 0 }; // radians per 50 ms frame
+  const folds = { left: null, right: null };
+  let foldTimer = null;
+  function foldAngle(side) {
+    const f = folds[side];
+    if (!f) return 0;
+    const i = Math.floor((performance.now() - f.start) / 50);
+    return i < f.seq.length ? f.seq[i] : f.hold;
+  }
+  function fold(side, spec) {
+    folds[side] = { seq: spec.seq, hold: spec.hold, start: performance.now() };
+    if (foldTimer) return;
+    foldTimer = setInterval(() => {
+      const moving = ['left', 'right'].some((s) => folds[s] && Math.floor((performance.now() - folds[s].start) / 50) < folds[s].seq.length);
+      if (!moving) { clearInterval(foldTimer); foldTimer = null; }
+      draw(...last); // the fold angle is part of the repaint key, so each frame redraws
+    }, 30);
+  }
+
+  // Ears: each target pixel is traced back through the fold and the boing squash (sy), so the ear has no gaps, and the
+  // outline is decided on the folded picture. Ear cells are half units (Bun and Cat always draw on the 0.5 grid).
+  function earCells(shape) {
+    if (shape.cells) return shape;
+    shape.cells = new Map();
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    shape.list.forEach(([x, y, v]) => {
+      const kx = Math.round(x * 2), ky = Math.round(y * 2);
+      shape.cells.set(kx + ',' + ky, v);
+      x0 = Math.min(x0, kx); x1 = Math.max(x1, kx); y0 = Math.min(y0, ky); y1 = Math.max(y1, ky);
+    });
+    shape.box = { x0, x1, y0, y1 };
+    return shape;
+  }
+  function drawEar(shape, bx, by, mirror, angle, sy, fill) {
+    earCells(shape);
+    const c = Math.cos(angle), s = Math.sin(angle);
+    const { x0, x1, y0, y1 } = shape.box;
+    // The shape cell a target pixel traces back to: un-fold (rotate back by -angle), then un-bend (divide y by sy).
+    const sourceAt = (tx, ty) => {
+      const px = tx / 2, py = ty / 2;
+      return shape.cells.get(Math.round((c * px - s * py) * 2) + ',' + Math.round(((s * px + c * py) / sy) * 2));
+    };
+    const pick = (tx, ty) => {
+      const kind = sourceAt(tx, ty);
+      if (kind) return kind === 'in' ? fill.in : fill.out;
+      if ((sourceAt(tx - 1, ty) && sourceAt(tx + 1, ty)) || (sourceAt(tx, ty - 1) && sourceAt(tx, ty + 1))) return fill.out;
+      return (sourceAt(tx + 1, ty) || sourceAt(tx - 1, ty) || sourceAt(tx, ty + 1) || sourceAt(tx, ty - 1)) ? fill.ink : null;
+    };
+    for (let ty = y0 - 5; ty <= y1 + 5; ty++) for (let tx = x0 - 5; tx <= x1 + 5; tx++) {
+      const col = pick(tx, ty);
+      if (!col) continue;
+      const px = tx / 2, py = ty / 2;
+      ctx.fillStyle = col;
+      ctx.fillRect(bx + (mirror < 0 ? -px - 0.5 : px), by + py, 0.5, 0.5);
+    }
+  }
   function ears(by, half = 12) { // half = distance of each ear base from the centre (80)
     const f = boingFrame(), sy = f < 0 ? 1 : boingSeq[f];
-    [[80 - half, 1], [80 + half, -1]].forEach(([bx, m]) => {
-      const at = (x, y, c) => { // cells are rescaled from the ear base (y = 0) and snapped to the pixel grid
-        const top = Math.round(y * sy / P) * P, bottom = Math.round((y + P) * sy / P) * P;
-        ctx.fillStyle = c; ctx.fillRect(bx + (m < 0 ? -x - P : x), by + top, P, Math.max(P, bottom - top));
-      };
-      const ear = xbox ? EAR_SMALL : wideLayout ? EAR_WIDE : EAR_NORMAL;
-      ear.outline.forEach(([x, y]) => at(x, y, C.ink));
-      ear.list.forEach(([x, y, v]) => at(x, y, v === 'in' ? C.earIn : C.gray));
-    });
+    const ear = xbox ? EAR_SMALL : wideLayout ? EAR_WIDE : EAR_NORMAL;
+    [[80 - half, 1, 'left'], [80 + half, -1, 'right']].forEach(([bx, m, side]) =>
+      drawEar(ear, bx, by, m, foldAngle(side), sy, { ink: C.ink, out: C.gray, in: C.earIn }));
   }
 
   const canvas = document.getElementById('retroCanvas');
@@ -398,10 +449,16 @@
     const up = (!b.touchpad && prevClick) || (!touching && prevTouch);
     if (bun && showPad && (down || up)) startBoing(down ? BOING_DOWN : BOING_UP);
     prevClick = !!b.touchpad; prevTouch = !!touching;
+    // A bumper folds the ear on its side (cat and bun): L1 for the left ear, R1 for the right one.
+    const l1 = !!b.l1, r1 = !!b.r1;
+    if ((bun || cat) && l1 !== prevL1) fold('left', l1 ? FOLD_PRESS : FOLD_RELEASE);
+    if ((bun || cat) && r1 !== prevR1) fold('right', r1 ? FOLD_PRESS : FOLD_RELEASE);
+    prevL1 = l1; prevR1 = r1;
 
     // Repaint only when something visible changed (sticks move in whole units, triggers show whole percents).
     const key = [Object.values(b).join(), Math.round(left.x * 4), Math.round(left.y * 4), Math.round(right.x * 4), Math.round(right.y * 4),
-      Math.round((tr.l2_norm || 0) * 100), Math.round((tr.r2_norm || 0) * 100), touching ? 1 : 0, boingFrame()].join('|');
+      Math.round((tr.l2_norm || 0) * 100), Math.round((tr.r2_norm || 0) * 100), touching ? 1 : 0, boingFrame(),
+      Math.round(foldAngle('left') * 100), Math.round(foldAngle('right') * 100)].join('|');
     if (key === lastKey) return;
     lastKey = key;
 
