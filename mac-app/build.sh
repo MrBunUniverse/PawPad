@@ -26,11 +26,11 @@ cat << 'EOF' > "$APP_BUNDLE/Contents/Info.plist"
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>PS4OverlayMenuBar</string>
+    <string>PawPad</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.ps4overlay.menubar</string>
+    <string>com.pawpad.menubar</string>
     <key>CFBundleName</key>
     <string>PawPad</string>
     <key>CFBundlePackageType</key>
@@ -38,7 +38,7 @@ cat << 'EOF' > "$APP_BUNDLE/Contents/Info.plist"
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>LSMinimumSystemVersion</key>
-    <string>10.15</string>
+    <string>11.0</string>
     <key>LSUIElement</key>
     <true/>
 </dict>
@@ -47,10 +47,13 @@ EOF
 
 # 5. Compile Swift binary with swiftc
 echo "Compiling native Swift Menu Bar binary..."
-swiftc -O "$SRC_DIR/PS4OverlayMenuBar.swift" -o "$APP_BUNDLE/Contents/MacOS/PS4OverlayMenuBar"
+swiftc -O -target "$(uname -m)-apple-macos11" "$SRC_DIR/PS4OverlayMenuBar.swift" -o "$APP_BUNDLE/Contents/MacOS/PawPad"
 
 # 6. Set permissions
-chmod +x "$APP_BUNDLE/Contents/MacOS/PS4OverlayMenuBar"
+chmod +x "$APP_BUNDLE/Contents/MacOS/PawPad"
 xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+
+# 7. Sign the whole bundle (ad-hoc). The designated requirement is the bundle id, so permission grants survive rebuilds.
+codesign --force --deep --sign - --requirements '=designated => identifier "com.pawpad.menubar"' "$APP_BUNDLE"
 
 echo "✓ Native macOS Menu Bar Application built successfully at $APP_BUNDLE!"
