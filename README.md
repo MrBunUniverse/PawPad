@@ -92,6 +92,7 @@ In a web browser, go to **http://localhost:8080/** and open **Settings**. Your c
 | **Touchpad** | Show or hide the touchpad (or the Guide button on the Xbox look) |
 | **Shadow** | A soft shadow behind the controller so it stands out on a busy game screen. Drag the slider to make it stronger; **Off** is the default |
 | **Frame rate** | How often the overlay redraws, 5 to 60 fps. Lower it to use less CPU, or for a choppy, stylised look. 60 is the default |
+| **Squeeze triggers** | **Off** (the default) shows L2 and R2 as a level meter with a 0-100 readout. **On** drops the meter and number: the button sinks and shrinks as you pull it |
 | **Source** | **Auto** (the PS4 when it's sending, otherwise your computer's controller), **PS4**, or **This computer** |
 
 The overlay stays **488 × 280** in every layout, so you never need to resize it.
