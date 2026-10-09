@@ -327,8 +327,8 @@
   };
   const sprite = (rows, cx, cy, c, raw) => {
     ctx.fillStyle = c;
-    const ox = raw ? cx - rows[0].length * P / 2 : cx - (rows[0].length >> 1);
-    const oy = raw ? cy - rows.length * P / 2 : cy - (rows.length >> 1);
+    const ox = raw ? sn(cx - rows[0].length * P / 2) : cx - (rows[0].length >> 1); // raw sprites snap to the grid, or odd widths blur
+    const oy = raw ? sn(cy - rows.length * P / 2) : cy - (rows.length >> 1);
     (P < 1 && !raw ? fine(rows) : rows).forEach((row, y) => {
       for (let x = 0; x < row.length; x++) if (row[x] === '#') ctx.fillRect(ox + x * P, oy + y * P, P, P);
     });
@@ -337,7 +337,7 @@
   const spriteSquash = (rows, cx, cy, c, s, raw) => {
     const src = P < 1 && !raw ? fine(rows) : rows, T = Math.max(1, Math.round(src.length * s));
     ctx.fillStyle = c;
-    const ox = raw ? cx - rows[0].length * P / 2 : cx - (rows[0].length >> 1), oy = cy - T * P / 2;
+    const ox = raw ? sn(cx - rows[0].length * P / 2) : cx - (rows[0].length >> 1), oy = sn(cy - T * P / 2);
     for (let t = 0; t < T; t++) {
       const row = src[Math.min(src.length - 1, Math.floor((t + 0.5) * src.length / T))];
       for (let x = 0; x < row.length; x++) if (row[x] === '#') ctx.fillRect(ox + x * P, oy + t * P, P, P);
