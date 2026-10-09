@@ -3,6 +3,7 @@
  * Looks: classic / fine (2x denser grid) / cat; layouts: normal / wide.
  * Every button has two states (idle / pressed); L2 and R2 show analog pressure
  * as a bar meter plus a 0-100 readout (level), or as a button that squeezes down (squeeze).
+ * Bun and Cat can also bulge the squeezed triggers (bulge) and squish every pressed button (squish).
  * Entry points: RetroPad.setStyle(...) and RetroPad.draw(state, leftStick, rightStick).
  */
 (function () {
@@ -201,8 +202,8 @@
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   // P = size of one drawn pixel in logical units: 1 = classic, 0.5 = fine (2x denser grid).
-  let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false, squeeze = false;
-  function setStyle(name, coat, tone, layout, pad, controller, triggerLook) {
+  let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false, squeeze = false, bulgeFx = false, squishFx = false;
+  function setStyle(name, coat, tone, layout, pad, controller, triggerLook, bulge, squish) {
     ({ W, H, OX, OY, g: G } = LAYOUTS[layout] || LAYOUTS.normal);
     showPad = pad !== false;
     wideLayout = layout === 'wide';
@@ -217,6 +218,9 @@
     }
     cat = name === 'cat';
     bun = name === 'bun';
+    const stylised = cat || bun; // only Bun and Cat take the bulge and squish effects; Classic and Fine never do
+    bulgeFx = stylised && bulge !== false;
+    squishFx = stylised && squish === true;
     if (bun && wideLayout) { OY -= 4; H += 4; } // headroom for the ears in the one-row layout
     themed = cat || bun || (name === 'fine' && tone === 'midnight'); // fine + midnight: the black-cat colours without the cat extras
     P = name === 'fine' || cat || bun ? 0.5 : 1;
@@ -299,13 +303,29 @@
     disc(cx, cy, r + (blocky ? 1 : P), C.ink, blocky); disc(cx, cy, r, fill, blocky);
     rect(cx - 1, cy - r, 1 + 2 * P, P, hi); rect(cx - 1, cy + r - (P < 1 ? P : 0), 1 + 2 * P, P, lo);
   };
+  // Squish (Bun / Cat only): a pressed box is 1 px shorter with its bottom edge fixed, and 1 px wider on each side.
+  const pBox = (x, y, w, h, fill, hi, lo, pressed) => (squishFx && pressed ? box(x - 1, y + 1, w + 2, h - 1, fill, hi, lo) : box(x, y, w, h, fill, hi, lo));
+  // Filled oval, built row by row on the P grid (used for squashed round buttons).
+  const oval = (cx, cy, rx, ry, c) => {
+    ctx.fillStyle = c;
+    for (let y = -ry; y < ry; y += P) {
+      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - ((y + P / 2) / ry) ** 2)) / P) * P;
+      if (half > 0) ctx.fillRect(cx - half, cy + y, half * 2, P);
+    }
+  };
+  // Round button: when pressed (Bun / Cat) it flattens by half a unit top and bottom and bulges 1 unit sideways; otherwise the normal ball.
+  const ballSq = (cx, cy, r, fill, hi, lo, pressed, blocky) => {
+    if (!(squishFx && pressed)) return ball(cx, cy, r, fill, hi, lo, blocky);
+    oval(cx, cy, r + 2, r + 0.5, C.ink);
+    oval(cx, cy, r + 1, r - 0.5, fill);
+  };
 
   const meterColor = f => (f < 0.34 ? C.m1 : f < 0.67 ? C.m2 : C.m3);
 
   function trigger(x, frac) {
     if (squeeze) { // no meter or readout: the button sinks down and gets shorter as it is pulled (bottom edge stays put)
       const s = Math.round(frac * 10); // up to 10 px: the button ends 4 px tall (3 would merge the highlight and shadow rows)
-      const w = Math.round(frac); // past half pull the button bulges 1 px out on each side, like a squeezed ball (1 px is all the wide layout has room for)
+      const w = bulgeFx ? Math.round(frac) : 0; // past half pull the button bulges 1 px out on each side, like a squeezed ball (1 px is all the wide layout has room for)
       box(x - w, 2 + s, 22 + 2 * w, 14 - s, C.gray, C.grayHi, C.grayLo);
       return;
     }
@@ -324,11 +344,11 @@
   }
 
   function bumper(x, on) {
-    box(x, 19 + (on ? 1 : 0), 22, 7, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo);
+    pBox(x, 19 + (on ? 1 : 0), 22, 7, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, on);
   }
 
   function pill(x, y, on) {
-    box(x, y + (on ? 1 : 0), 8, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo);
+    pBox(x, y + (on ? 1 : 0), 8, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, on);
   }
 
   const ARROWS = {
@@ -336,7 +356,7 @@
     left: ['..#', '.##', '###', '.##', '..#'], right: ['#..', '##.', '###', '##.', '#..']
   };
   function arm(x, y, w, h, on, dir) {
-    box(x, y + (on ? 1 : 0), w, h, on ? C.on : C.white, on ? C.onHi : C.white, on ? C.onLo : C.grayHi);
+    pBox(x, y + (on ? 1 : 0), w, h, on ? C.on : C.white, on ? C.onHi : C.white, on ? C.onLo : C.grayHi, on);
     if (P < 1) sprite(ARROWS[dir], x + w / 2, y + h / 2 + (on ? 1 : 0), on ? C.brown : C.grayHi, true);
   }
 
@@ -344,14 +364,14 @@
     disc(cx, cy, 11, C.ink, true); disc(cx, cy, 10, C.grayLo, true);
     const tx = cx + Math.round(v.x * 4), ty = cy + Math.round(v.y * 4) + (pressed ? 1 : 0);
     if (cat) { // no light-up: the cap keeps its coat and the paw squishes instead
-      ball(tx, ty, 6, C.capFill, C.capHi, C.capLo, true);
+      ballSq(tx, ty, 6, C.capFill, C.capHi, C.capLo, pressed, true);
       const paw = pressed ? PAW_SQUISH : PAW, py = ty + (pressed ? 0.5 : 0);
       sprite(paw, tx, py + P, C.capLo, true); // drop shadow makes the paw pop
       sprite(paw, tx, py, C.bean, true);
       return;
     }
     if (bun) { // no light-up: cream cap with a pink bunny paw that squishes when pressed
-      ball(tx, ty, 6, C.capFill, C.capHi, C.capLo, true);
+      ballSq(tx, ty, 6, C.capFill, C.capHi, C.capLo, pressed, true);
       const paw = pressed ? BUN_PAW_SQUISH : BUN_PAW, py = ty + (pressed ? 0.5 : 0);
       sprite(paw, tx, py + P, C.capLo, true); // soft shadow under the paw
       sprite(paw, tx, py, C.blush, true);
@@ -373,14 +393,14 @@
   // The round Guide button sits where the touchpad is on the PlayStation pad (centre 80, 38).
   function guide(on) {
     const cy = 38 + (on ? 1 : 0);
-    ball(80, cy, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo);
+    ballSq(80, cy, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, on);
     sprite(GUIDE_LOGO, 80, cy, on ? C.white : C.dim);
   }
 
   function face(name, cx, cy, color, on) {
     cy += on ? 1 : 0;
     if (xbox) color = XBOX_COLOUR()[name];
-    ball(cx, cy, 5, on ? color : C.gray, on ? C.white : C.grayHi, on ? C.ink : C.grayLo);
+    ballSq(cx, cy, 5, on ? color : C.gray, on ? C.white : C.grayHi, on ? C.ink : C.grayLo, on);
     const ink = on ? C.white : color;
     if (xbox) sprite(LETTERS[name], cx, cy, ink);
     else if (P < 1) sprite(FINE_SYMBOLS[name], cx, cy + (name === 'triangle' ? -1 : 0), ink, true); // triangle nudged up so its centre of mass sits on the button centre
@@ -423,9 +443,9 @@
       }
       if (bun) ears(by); // ears stay attached to the pad: they rise with it and boing on top
       if (cat) catEars([[70, 1], [90, -1]], by + 0.5, b.touchpad ? CAT_EAR_PS_DOWN : CAT_EAR_PS); // ears behind the touchpad: its top edge covers their bases
-      if (bun) box(64, by, 32, 14, b.touchpad ? C.padLo : C.pad, b.touchpad ? C.pad : C.padHi, C.padLo);
-      else if (themed) box(64, by, 32, 14, b.touchpad ? C.grayLo : C.grayHi, b.touchpad ? C.gray : C.white, C.grayLo);
-      else box(64, by, 32, 14, b.touchpad ? C.brown : C.gold, b.touchpad ? C.brown : C.yellow, C.brown);
+      if (bun) pBox(64, by, 32, 14, b.touchpad ? C.padLo : C.pad, b.touchpad ? C.pad : C.padHi, C.padLo, b.touchpad);
+      else if (themed) pBox(64, by, 32, 14, b.touchpad ? C.grayLo : C.grayHi, b.touchpad ? C.gray : C.white, C.grayLo, b.touchpad);
+      else pBox(64, by, 32, 14, b.touchpad ? C.brown : C.gold, b.touchpad ? C.brown : C.yellow, C.brown, b.touchpad);
     });
 
     at('share', () => pill(51, 33, b.share));
