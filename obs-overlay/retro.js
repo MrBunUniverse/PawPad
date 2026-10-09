@@ -69,6 +69,9 @@
     '#.#,#.#,###,..#,..#', '###,#..,###,..#,###', '###,#..,###,#.#,###', '###,..#,..#,..#,..#',
     '###,#.#,###,#.#,###', '###,#.#,###,..#,###'
   ].map(d => d.split(','));
+  // Button names: 3x5 letters (digits come from DIGITS). Drawn on 1-unit cells, so every style reads the same.
+  const NAME_FONT = { L: '#..,#..,#..,#..,###', R: '##.,#.#,##.,#.#,#.#', T: '###,.#.,.#.,.#.,.#.', B: '##.,#.#,##.,#.#,##.' };
+  const nameGlyph = ch => (NAME_FONT[ch] ? NAME_FONT[ch].split(',') : DIGITS[+ch]);
 
   // Face symbols for fine mode, built on the 0.5 grid (14 px wide, 2 px stroke).
   const grid = (w, h, on) => Array.from({ length: h }, (_, j) => Array.from({ length: w }, (_, i) => (on(i, j) ? '#' : '.')).join(''));
@@ -253,8 +256,8 @@
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   // P = size of one drawn pixel in logical units: 1 = classic, 0.5 = fine (2x denser grid).
-  let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false, squeeze = false, bulgeFx = false, squishFx = false;
-  function setStyle(name, coat, tone, layout, pad, controller, triggerLook, bulge, squish) {
+  let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false, squeeze = false, bulgeFx = false, squishFx = false, nameOn = true;
+  function setStyle(name, coat, tone, layout, pad, controller, triggerLook, bulge, squish, names) {
     ({ W, H, OX, OY, g: G } = LAYOUTS[layout] || LAYOUTS.normal);
     showPad = pad !== false;
     wideLayout = layout === 'wide';
@@ -272,6 +275,7 @@
     const stylised = cat || bun; // only Bun and Cat take the bulge and squish effects; Classic and Fine never do
     bulgeFx = stylised && bulge !== false;
     squishFx = stylised && squish === true;
+    nameOn = names !== false;
     if (bun && wideLayout) { OY -= 4; H += 4; } // headroom for the ears in the one-row layout
     themed = cat || bun || (name === 'fine' && tone === 'midnight'); // fine + midnight: the black-cat colours without the cat extras
     P = name === 'fine' || cat || bun ? 0.5 : 1;
@@ -422,11 +426,22 @@
 
   const meterColor = f => (f < 0.34 ? C.m1 : f < 0.67 ? C.m2 : C.m3);
 
-  function trigger(x, frac) {
+  // A button name (3x5 glyphs, 1-unit cells and gaps) with its top-left corner at (x, y).
+  const nameText = (text, x, y, c) => {
+    ctx.fillStyle = c;
+    x = Math.round(x); y = Math.round(y); // whole units, or the letters blur
+    [...text].forEach((ch, i) => nameGlyph(ch).forEach((row, r) => {
+      for (let k = 0; k < row.length; k++) if (row[k] === '#') ctx.fillRect(x + i * 4 + k, y + r, 1, 1);
+    }));
+  };
+  const nameWidth = text => text.length * 4 - 1;
+
+  function trigger(x, frac, name) {
     if (squeeze) { // no meter or readout: the button sinks down and gets shorter as it is pulled (bottom edge stays put)
       const s = Math.round(frac * 10); // up to 10 px: the button ends 4 px tall (3 would merge the highlight and shadow rows)
       const w = bulgeFx ? Math.round(frac) : 0; // past half pull the button bulges 1 px out on each side, like a squeezed ball (1 px is all the wide layout has room for)
       box(x - w, 2 + s, 22 + 2 * w, 14 - s, C.gray, C.grayHi, C.grayLo);
+      if (nameOn && s <= 5) nameText(name, x + 8, Math.round(6.5 + s / 2), C.text); // the name is centred in the box; it hides once the box is too short to hold it
       return;
     }
     box(x, 2, 22, 14, C.gray, C.grayHi, C.grayLo);
@@ -443,8 +458,10 @@
     }
   }
 
-  function bumper(x, on, p) {
+  function bumper(x, on, p, name) {
     pBox(x, 19 + (on ? 1 : 0), 22, 7, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, p);
+    const g = squashed(x, 19 + (on ? 1 : 0), 22, 7, p); // the name shows only while the bumper is whole: 5 rows of letters do not fit a squashed one
+    if (nameOn && g.h >= 7) nameText(name, Math.round(g.x + (g.w - nameWidth(name)) / 2), g.y + 1, on ? C.ink : C.text);
   }
 
   function pill(x, y, on, p) {
@@ -540,8 +557,10 @@
 
     ctx.clearRect(OX, OY, W, H);
     const at = (name, fn) => { ctx.save(); ctx.translate(...G[name]); fn(); ctx.restore(); };
-    at('lt', () => { trigger(22, tr.l2_norm || 0); bumper(22, b.l1, sqp('l1')); });
-    at('rt', () => { trigger(116, tr.r2_norm || 0); bumper(116, b.r1, sqp('r1')); });
+    // Button names follow the controller: PlayStation L2 / R2 and L1 / R1, Xbox LT / RT and LB / RB.
+    const N = xbox ? { lt: 'LT', rt: 'RT', lb: 'LB', rb: 'RB' } : { lt: 'L2', rt: 'R2', lb: 'L1', rb: 'R1' };
+    at('lt', () => { trigger(22, tr.l2_norm || 0, N.lt); bumper(22, b.l1, sqp('l1'), N.lb); });
+    at('rt', () => { trigger(116, tr.r2_norm || 0, N.rt); bumper(116, b.r1, sqp('r1'), N.rb); });
 
     // PlayStation: the touchpad is a block that bounces when touched and darkens when clicked.
     // Xbox: a round Guide button (the same 'touchpad' slot). Bun / Cat ears sit on whichever it is.

@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const config = { delayMs: 0, deadzone: 0.06, deviceKind: null, shadow: 0, fps: 60, trigger: 'level', bulge: true, squish: false };
+  const config = { delayMs: 0, deadzone: 0.06, deviceKind: null, shadow: 0, fps: 60, trigger: 'level', bulge: true, squish: false, names: true };
   const stateQueue = []; // FIFO buffer that delays input to match capture-card lag
 
   const $ = (id) => document.getElementById(id);
@@ -36,6 +36,7 @@
   const squeezeToggle = $('squeezeToggle');
   const bulgeToggle = $('bulgeToggle');
   const squishToggle = $('squishToggle');
+  const namesToggle = $('namesToggle');
 
   // Segmented buttons mirror each <select data-seg>: the select stays the source of truth.
   const COAT_DOT = { pumpkin: '#d9822b', shadow: '#2b2b33', snowball: '#e6e6ee', smokey: '#7d8794', mittens: '#e3d2b2' };
@@ -82,7 +83,7 @@
   // Controller type 'auto' follows the connected pad (PlayStation pads and "no pad" -> PlayStation look, anything else -> Xbox look).
   const effectiveController = () => (config.controller !== 'auto' ? config.controller : ['playstation', null].includes(config.deviceKind) ? 'ps' : 'xbox');
   function applyLook(patch) {
-    const l = { style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source, shadow: config.shadow, fps: config.fps, trigger: config.trigger, bulge: config.bulge, squish: config.squish, ...patch };
+    const l = { style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source, shadow: config.shadow, fps: config.fps, trigger: config.trigger, bulge: config.bulge, squish: config.squish, names: config.names, ...patch };
     config.style = ['fine', 'bun', 'cat'].includes(l.style) ? l.style : 'classic';
     config.coat = [...coatInput.options].some(o => o.value === l.coat) ? l.coat : config.coat || 'pumpkin';
     config.tone = l.tone === 'midnight' ? 'midnight' : 'default';
@@ -93,17 +94,18 @@
     config.trigger = l.trigger === 'squeeze' ? 'squeeze' : 'level'; // L2/R2 look: level meter with readout, or squeeze
     config.bulge = l.bulge !== false && l.bulge !== 'false'; // Bun / Cat only: squeezed triggers bulge out (on by default)
     config.squish = l.squish === true || l.squish === 'true'; // Bun / Cat only: pressed buttons squish and bulge (off by default)
+    config.names = l.names !== false && l.names !== 'false'; // button names on the controller: LT / RT or L2 / R2 (on by default)
     setShadow(Math.min(100, Math.max(0, Math.round(Number(l.shadow) || 0))));
     setFps(Math.min(60, Math.max(5, Math.round(Number(l.fps) || 60))));
     const ctrl = effectiveController();
     styleInput.value = config.style; coatInput.value = config.coat; toneInput.value = config.tone;
-    layoutInput.value = config.layout; controllerInput.value = config.controller; sourceInput.value = config.source; padToggle.checked = config.pad; squeezeToggle.checked = config.trigger === 'squeeze'; bulgeToggle.checked = config.bulge; squishToggle.checked = config.squish;
+    layoutInput.value = config.layout; controllerInput.value = config.controller; sourceInput.value = config.source; padToggle.checked = config.pad; squeezeToggle.checked = config.trigger === 'squeeze'; bulgeToggle.checked = config.bulge; squishToggle.checked = config.squish; namesToggle.checked = config.names;
     coatRow.hidden = config.style !== 'cat';
     toneRow.hidden = config.style !== 'fine';
     padLabel.textContent = ctrl === 'xbox' ? 'Guide button' : 'Touchpad';
     syncSegs();
-    window.RetroPad.setStyle(config.style, config.coat, config.tone, config.layout, config.pad, ctrl, config.trigger, config.bulge, config.squish);
-    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source', 'shadow', 'fps', 'trigger', 'bulge', 'squish']) localStorage.setItem('pad' + k[0].toUpperCase() + k.slice(1), config[k]); } catch (e) { /* storage blocked */ }
+    window.RetroPad.setStyle(config.style, config.coat, config.tone, config.layout, config.pad, ctrl, config.trigger, config.bulge, config.squish, config.names);
+    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source', 'shadow', 'fps', 'trigger', 'bulge', 'squish', 'names']) localStorage.setItem('pad' + k[0].toUpperCase() + k.slice(1), config[k]); } catch (e) { /* storage blocked */ }
   }
 
   function setDeadzone(fraction) {
@@ -144,7 +146,7 @@
     setDelay(config.delayMs);
     setDeadzone(config.deadzone);
     const saved = {};
-    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source', 'shadow', 'fps', 'trigger', 'bulge', 'squish']) saved[k] = localStorage.getItem('pad' + k[0].toUpperCase() + k.slice(1)); } catch (e) { /* storage blocked */ }
+    try { for (const k of ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source', 'shadow', 'fps', 'trigger', 'bulge', 'squish', 'names']) saved[k] = localStorage.getItem('pad' + k[0].toUpperCase() + k.slice(1)); } catch (e) { /* storage blocked */ }
     // ?preset=pumpkin (or classic / fine / bun) is a one-word shortcut; ?style= / ?cat= still work. Any of them pins this page.
     const preset = params.get('preset');
     const isCoat = (p) => [...coatInput.options].some(o => o.value === p);
@@ -164,7 +166,8 @@
       fps: saved.fps,
       trigger: saved.trigger,
       bulge: saved.bulge,
-      squish: saved.squish
+      squish: saved.squish,
+      names: saved.names
     });
   }
 
@@ -182,10 +185,11 @@
   squeezeToggle.addEventListener('change', () => { applyLook({ trigger: squeezeToggle.checked ? 'squeeze' : 'level' }); sendLook(); });
   bulgeToggle.addEventListener('change', () => { applyLook({ bulge: bulgeToggle.checked }); sendLook(); });
   squishToggle.addEventListener('change', () => { applyLook({ squish: squishToggle.checked }); sendLook(); });
+  namesToggle.addEventListener('change', () => { applyLook({ names: namesToggle.checked }); sendLook(); });
   // Test mode runs on the bridge so every client (including OBS) receives it.
   // The chosen look lives on the bridge, so every page (OBS included) follows it with no URL changes.
   const sendLook = () => {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'look', style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source, shadow: config.shadow, fps: config.fps, trigger: config.trigger, bulge: config.bulge, squish: config.squish }));
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'look', style: config.style, coat: config.coat, tone: config.tone, layout: config.layout, pad: config.pad, controller: config.controller, source: config.source, shadow: config.shadow, fps: config.fps, trigger: config.trigger, bulge: config.bulge, squish: config.squish, names: config.names }));
   };
   const sendSim = () => {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'sim', on: simulatorToggle.checked }));

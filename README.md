@@ -95,6 +95,7 @@ In a web browser, go to **http://localhost:8080/** and open **Settings**. Your c
 | **Squeeze triggers** | **Off** (the default) shows L2 and R2 as a level meter with a 0-100 readout. **On** drops the meter and number: the button sinks and shrinks as you pull it |
 | **Trigger bulge** | With **Squeeze triggers** on, a pulled trigger also bulges out a little, like a squeezed ball. Bun and Cat only. On by default |
 | **Squish buttons** | Every button squishes and bulges a little when pressed. Bun and Cat only. Off by default |
+| **Button names** | Names the triggers and bumpers: LT / RT and LB / RB on the Xbox look, L2 / R2 and L1 / R1 on the PlayStation look. Triggers show their name in Squeeze mode only, since the level meter fills their box. On by default |
 | **Source** | **Auto** (the PS4 when it's sending, otherwise your computer's controller), **PS4**, or **This computer** |
 
 The overlay stays **488 × 280** in every layout, so you never need to resize it.
