@@ -303,21 +303,57 @@
     disc(cx, cy, r + (blocky ? 1 : P), C.ink, blocky); disc(cx, cy, r, fill, blocky);
     rect(cx - 1, cy - r, 1 + 2 * P, P, hi); rect(cx - 1, cy + r - (P < 1 ? P : 0), 1 + 2 * P, P, lo);
   };
-  // Squish (Bun / Cat only): a pressed box is 1 px shorter with its bottom edge fixed, and 1 px wider on each side.
-  const pBox = (x, y, w, h, fill, hi, lo, pressed) => (squishFx && pressed ? box(x - 1, y + 1, w + 2, h - 1, fill, hi, lo) : box(x, y, w, h, fill, hi, lo));
+  // Squish (Bun / Cat only). Each button has a spring: a press pulls it to 1 with a quick snap, and a release swings it back past
+  // rest (down to about -0.4, a bouncy stretch) before it settles. A press the overlay skipped between two frames is latched
+  // (latch), so a tap shorter than a frame still squashes. Springs step in real time, so mashing never leaves one stuck.
+  const SQ_BUTTONS = ['l1', 'r1', 'share', 'options', 'touchpad', 'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right', 'l3', 'r3', 'triangle', 'circle', 'cross', 'square'];
+  const SQ_PRESS = { w: 2 * Math.PI * 7, z: 0.55 }, SQ_RELEASE = { w: 2 * Math.PI * 4.5, z: 0.3 }; // stiffness (rad/s), damping ratio
+  const SQ_HOLD = 80; // ms a latched press stays on
+  const sq = Object.fromEntries(SQ_BUTTONS.map(n => [n, { p: 0, v: 0, until: 0 }]));
+  let sqBusy = false, sqClock = 0;
+  const sn = v => Math.round(v / P) * P; // snap to the pixel grid
+  const sqp = n => (squishFx ? sq[n].p : 0); // a button's squish: 0 at rest, 1 pressed, below 0 stretched
+  function stepSquish(buttons) {
+    const now = performance.now();
+    const dt = sqClock ? Math.min((now - sqClock) / 1000, 0.05) : 0; // capped, so a hidden overlay cannot blow a spring up
+    sqClock = now;
+    const steps = Math.ceil(dt * 240), h = steps ? dt / steps : 0;
+    sqBusy = false;
+    for (const n of SQ_BUTTONS) {
+      const s = sq[n], target = (buttons[n] || now < s.until) ? 1 : 0, k = target ? SQ_PRESS : SQ_RELEASE;
+      const kw = k.w * k.w, cz = 2 * k.z * k.w;
+      for (let i = 0; i < steps; i++) { s.v += (-kw * (s.p - target) - cz * s.v) * h; s.p += s.v * h; }
+      s.p = Math.max(-0.4, Math.min(1.2, s.p));
+      if (Math.abs(s.p - target) < 0.002 && Math.abs(s.v) < 0.02 && now >= s.until) { s.p = target; s.v = 0; }
+      else sqBusy = true;
+    }
+  }
+  // Called for pad states the overlay skipped: a press in them still squashes.
+  function latch(buttons) {
+    const now = performance.now();
+    if (buttons) for (const n of SQ_BUTTONS) if (buttons[n]) sq[n].until = now + SQ_HOLD;
+  }
+  // Box squash: shorter from the top with the bottom edge fixed (taller below 0), and wider on each side by the same amount.
+  const pBox = (x, y, w, h, fill, hi, lo, p) => {
+    const dh = Math.min(sn(2 * p), h - 3), bl = sn(p);
+    if (!squishFx || (!dh && !bl)) return box(x, y, w, h, fill, hi, lo);
+    box(x - bl, y + dh, w + 2 * bl, h - dh, fill, hi, lo);
+  };
   // Filled oval, built row by row on the P grid (used for squashed round buttons).
   const oval = (cx, cy, rx, ry, c) => {
     ctx.fillStyle = c;
     for (let y = -ry; y < ry; y += P) {
-      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - ((y + P / 2) / ry) ** 2)) / P) * P;
+      const half = sn(rx * Math.sqrt(Math.max(0, 1 - ((y + P / 2) / ry) ** 2)));
       if (half > 0) ctx.fillRect(cx - half, cy + y, half * 2, P);
     }
   };
-  // Round button: when pressed (Bun / Cat) it flattens by half a unit top and bottom and bulges 1 unit sideways; otherwise the normal ball.
-  const ballSq = (cx, cy, r, fill, hi, lo, pressed, blocky) => {
-    if (!(squishFx && pressed)) return ball(cx, cy, r, fill, hi, lo, blocky);
-    oval(cx, cy, r + 2, r + 0.5, C.ink);
-    oval(cx, cy, r + 1, r - 0.5, fill);
+  // Round button squash: at full press 1.5 units shorter and 1 unit wider (side scales the sideways part); a normal ball at rest.
+  const ballSq = (cx, cy, r, fill, hi, lo, p, blocky, side = 1) => {
+    const rx = r + sn(p * side), ry = r - sn(p * 1.5);
+    if (rx === r && ry === r) return ball(cx, cy, r, fill, hi, lo, blocky);
+    const t = blocky ? 1 : P; // ink ring thickness, as in ball()
+    oval(cx, cy, rx + t, ry + t, C.ink);
+    oval(cx, cy, rx, ry, fill);
   };
 
   const meterColor = f => (f < 0.34 ? C.m1 : f < 0.67 ? C.m2 : C.m3);
@@ -343,35 +379,35 @@
     }
   }
 
-  function bumper(x, on) {
-    pBox(x, 19 + (on ? 1 : 0), 22, 7, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, on);
+  function bumper(x, on, p) {
+    pBox(x, 19 + (on ? 1 : 0), 22, 7, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, p);
   }
 
-  function pill(x, y, on) {
-    pBox(x, y + (on ? 1 : 0), 8, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, on);
+  function pill(x, y, on, p) {
+    pBox(x, y + (on ? 1 : 0), 8, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, p);
   }
 
   const ARROWS = {
     up: ['..#..', '.###.', '#####'], down: ['#####', '.###.', '..#..'],
     left: ['..#', '.##', '###', '.##', '..#'], right: ['#..', '##.', '###', '##.', '#..']
   };
-  function arm(x, y, w, h, on, dir) {
-    pBox(x, y + (on ? 1 : 0), w, h, on ? C.on : C.white, on ? C.onHi : C.white, on ? C.onLo : C.grayHi, on);
+  function arm(x, y, w, h, on, dir, p) {
+    pBox(x, y + (on ? 1 : 0), w, h, on ? C.on : C.white, on ? C.onHi : C.white, on ? C.onLo : C.grayHi, p);
     if (P < 1) sprite(ARROWS[dir], x + w / 2, y + h / 2 + (on ? 1 : 0), on ? C.brown : C.grayHi, true);
   }
 
-  function stick(cx, cy, v, pressed) {
+  function stick(cx, cy, v, pressed, p) {
     disc(cx, cy, 11, C.ink, true); disc(cx, cy, 10, C.grayLo, true);
     const tx = cx + Math.round(v.x * 4), ty = cy + Math.round(v.y * 4) + (pressed ? 1 : 0);
     if (cat) { // no light-up: the cap keeps its coat and the paw squishes instead
-      ballSq(tx, ty, 6, C.capFill, C.capHi, C.capLo, pressed, true);
+      ballSq(tx, ty, 6, C.capFill, C.capHi, C.capLo, p, true, 0.5);
       const paw = pressed ? PAW_SQUISH : PAW, py = ty + (pressed ? 0.5 : 0);
       sprite(paw, tx, py + P, C.capLo, true); // drop shadow makes the paw pop
       sprite(paw, tx, py, C.bean, true);
       return;
     }
     if (bun) { // no light-up: cream cap with a pink bunny paw that squishes when pressed
-      ballSq(tx, ty, 6, C.capFill, C.capHi, C.capLo, pressed, true);
+      ballSq(tx, ty, 6, C.capFill, C.capHi, C.capLo, p, true, 0.5);
       const paw = pressed ? BUN_PAW_SQUISH : BUN_PAW, py = ty + (pressed ? 0.5 : 0);
       sprite(paw, tx, py + P, C.capLo, true); // soft shadow under the paw
       sprite(paw, tx, py, C.blush, true);
@@ -391,16 +427,16 @@
   const XBOX_COLOUR = () => ({ cross: C.tri, circle: C.cir, square: C.crs, triangle: C.yel });
   const GUIDE_LOGO = ['#.#', '.#.', '#.#'];
   // The round Guide button sits where the touchpad is on the PlayStation pad (centre 80, 38).
-  function guide(on) {
+  function guide(on, p) {
     const cy = 38 + (on ? 1 : 0);
-    ballSq(80, cy, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, on);
+    ballSq(80, cy, 5, on ? C.on : C.gray, on ? C.onHi : C.grayHi, on ? C.onLo : C.grayLo, p);
     sprite(GUIDE_LOGO, 80, cy, on ? C.white : C.dim);
   }
 
-  function face(name, cx, cy, color, on) {
+  function face(name, cx, cy, color, on, p) {
     cy += on ? 1 : 0;
     if (xbox) color = XBOX_COLOUR()[name];
-    ballSq(cx, cy, 5, on ? color : C.gray, on ? C.white : C.grayHi, on ? C.ink : C.grayLo, on);
+    ballSq(cx, cy, 5, on ? color : C.gray, on ? C.white : C.grayHi, on ? C.ink : C.grayLo, p);
     const ink = on ? C.white : color;
     if (xbox) sprite(LETTERS[name], cx, cy, ink);
     else if (P < 1) sprite(FINE_SYMBOLS[name], cx, cy + (name === 'triangle' ? -1 : 0), ink, true); // triangle nudged up so its centre of mass sits on the button centre
@@ -419,17 +455,18 @@
     const up = (!b.touchpad && prevClick) || (!touching && prevTouch);
     if (bun && showPad && (down || up)) startBoing(down ? BOING_DOWN : BOING_UP);
     prevClick = !!b.touchpad; prevTouch = !!touching;
+    stepSquish(b);
 
     // Repaint only when something visible changed (sticks move in whole units, triggers show whole percents).
     const key = [Object.values(b).join(), Math.round(left.x * 4), Math.round(left.y * 4), Math.round(right.x * 4), Math.round(right.y * 4),
-      Math.round((tr.l2_norm || 0) * 100), Math.round((tr.r2_norm || 0) * 100), touching ? 1 : 0, boingFrame()].join('|');
+      Math.round((tr.l2_norm || 0) * 100), Math.round((tr.r2_norm || 0) * 100), touching ? 1 : 0, boingFrame(), squishFx ? SQ_BUTTONS.map(n => Math.round(sq[n].p * 32)).join() : ''].join('|');
     if (key === lastKey) return;
     lastKey = key;
 
     ctx.clearRect(OX, OY, W, H);
     const at = (name, fn) => { ctx.save(); ctx.translate(...G[name]); fn(); ctx.restore(); };
-    at('lt', () => { trigger(22, tr.l2_norm || 0); bumper(22, b.l1); });
-    at('rt', () => { trigger(116, tr.r2_norm || 0); bumper(116, b.r1); });
+    at('lt', () => { trigger(22, tr.l2_norm || 0); bumper(22, b.l1, sqp('l1')); });
+    at('rt', () => { trigger(116, tr.r2_norm || 0); bumper(116, b.r1, sqp('r1')); });
 
     // PlayStation: the touchpad is a block that bounces when touched and darkens when clicked.
     // Xbox: a round Guide button (the same 'touchpad' slot). Bun / Cat ears sit on whichever it is.
@@ -438,37 +475,39 @@
       if (xbox) {
         if (bun) ears(33, 4);
         if (cat) catEars([[77.5, 1], [82.5, -1]], 36.5); // anchors sit inside the button's outline; the button covers the bases
-        guide(b.touchpad);
+        guide(b.touchpad, sqp('touchpad'));
         return;
       }
       if (bun) ears(by); // ears stay attached to the pad: they rise with it and boing on top
       if (cat) catEars([[70, 1], [90, -1]], by + 0.5, b.touchpad ? CAT_EAR_PS_DOWN : CAT_EAR_PS); // ears behind the touchpad: its top edge covers their bases
-      if (bun) pBox(64, by, 32, 14, b.touchpad ? C.padLo : C.pad, b.touchpad ? C.pad : C.padHi, C.padLo, b.touchpad);
-      else if (themed) pBox(64, by, 32, 14, b.touchpad ? C.grayLo : C.grayHi, b.touchpad ? C.gray : C.white, C.grayLo, b.touchpad);
-      else pBox(64, by, 32, 14, b.touchpad ? C.brown : C.gold, b.touchpad ? C.brown : C.yellow, C.brown, b.touchpad);
+      if (bun) pBox(64, by, 32, 14, b.touchpad ? C.padLo : C.pad, b.touchpad ? C.pad : C.padHi, C.padLo, sqp('touchpad'));
+      else if (themed) pBox(64, by, 32, 14, b.touchpad ? C.grayLo : C.grayHi, b.touchpad ? C.gray : C.white, C.grayLo, sqp('touchpad'));
+      else pBox(64, by, 32, 14, b.touchpad ? C.brown : C.gold, b.touchpad ? C.brown : C.yellow, C.brown, sqp('touchpad'));
     });
 
-    at('share', () => pill(51, 33, b.share));
-    at('options', () => pill(101, 33, b.options));
+    at('share', () => pill(51, 33, b.share, sqp('share')));
+    at('options', () => pill(101, 33, b.options, sqp('options')));
 
     at('dpad', () => {
-      arm(33, 36, 7, 8, b.dpad_up, 'up');
-      arm(33, 50, 7, 8, b.dpad_down, 'down');
-      arm(25, 43, 8, 7, b.dpad_left, 'left');
-      arm(40, 43, 8, 7, b.dpad_right, 'right');
+      arm(33, 36, 7, 8, b.dpad_up, 'up', sqp('dpad_up'));
+      arm(33, 50, 7, 8, b.dpad_down, 'down', sqp('dpad_down'));
+      arm(25, 43, 8, 7, b.dpad_left, 'left', sqp('dpad_left'));
+      arm(40, 43, 8, 7, b.dpad_right, 'right', sqp('dpad_right'));
     });
 
-    at('ls', () => stick(62, 56, left, b.l3));
-    at('rs', () => stick(98, 56, right, b.r3));
+    at('ls', () => stick(62, 56, left, b.l3, sqp('l3')));
+    at('rs', () => stick(98, 56, right, b.r3, sqp('r3')));
 
     at('face', () => {
-      face('triangle', 124, 36, C.tri, b.triangle);
-      face('circle', 133, 45, C.cir, b.circle);
-      face('cross', 124, 54, C.crs, b.cross);
-      face('square', 115, 45, C.sqr, b.square);
+      face('triangle', 124, 36, C.tri, b.triangle, sqp('triangle'));
+      face('circle', 133, 45, C.cir, b.circle, sqp('circle'));
+      face('cross', 124, 54, C.crs, b.cross, sqp('cross'));
+      face('square', 115, 45, C.sqr, b.square, sqp('square'));
     });
   }
 
-  window.RetroPad = { draw, setStyle };
+  // Called once per overlay frame (app.js), so a squish keeps moving when no new pad state arrives.
+  function tick() { if (squishFx && sqBusy) draw(...last); }
+  window.RetroPad = { draw, setStyle, latch, tick };
   setStyle('classic');
 })();

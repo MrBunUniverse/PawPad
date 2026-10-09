@@ -215,8 +215,12 @@
     if (now - lastFrame >= 1000 / config.fps - 2) {
       lastFrame = now;
       let due = null; // several states can arrive per frame: only the newest one is worth drawing
-      while (stateQueue.length && now - stateQueue[0].localTime >= config.delayMs) due = stateQueue.shift().state;
+      while (stateQueue.length && now - stateQueue[0].localTime >= config.delayMs) {
+        if (due) window.RetroPad.latch(due.buttons); // a skipped state still counts: a tap shorter than a frame still squashes
+        due = stateQueue.shift().state;
+      }
       if (due) renderState(due);
+      window.RetroPad.tick(); // keeps the squish springs moving between pad states, on the same frame-rate cap
     }
     requestAnimationFrame(animationLoop);
   }
