@@ -6,7 +6,7 @@ PawPad puts your controller on your stream as pixel-art buttons. Buttons light u
 
 ![PawPad: your PS4 controller, but cute. Shown in the Classic, Bun and Cat looks.](docs/looks.png)
 
-- **Pick a look:** Classic, Bun (a bunny with floppy ears), or Cat (five cat colors to choose from).
+- **Pick a look:** Classic, Bun (a bunny with floppy ears), Cat, Fox, Dog or Wolf (each with its own set of colors to choose from).
 - **Xbox look too:** it works with Xbox-style controllers.
 - **Play on PS4 or on your computer:** use a PS4 with a small plugin, or just plug a controller into your computer.
 
@@ -85,7 +85,7 @@ In a web browser, go to **http://localhost:8080/** and open **Settings**. Your c
 | Setting | What it does |
 |---|---|
 | **Controller** | **Auto** picks the right controller for what you plug in. You can also choose **PlayStation** or **Xbox** |
-| **Style** | **Classic** (chunky pixels, the default). **Fine** (smoother and sharper). **Bun** (a cute bunny with ears that bounce when you press the touchpad, and fold down on the side of the bumper you press: L1 for the left ear, R1 for the right). **Cat** (cat ears that fold down with the bumper on their side, and paw-print sticks) |
+| **Style** | **Classic** (chunky pixels, the default). **Fine** (smoother and sharper). **Bun** (a cute bunny with ears that bounce when you press the touchpad, and fold down on the side of the bumper you press: L1 for the left ear, R1 for the right). **Cat** (cat ears that fold down with the bumper on their side, and paw-print sticks). **Fox** (tall pointed ears with dark tips, four coats: red, snow, silver, fennec). **Dog** (floppy ears that bounce with the touchpad, four coats: golden, chocolate, husky, corgi). **Wolf** (tall upright ears, four coats: grey, black, white, timber) |
 | **Colors** | For Fine: **Default**, or **Midnight** (dark) |
 | **Which cat** | For Cat: Pumpkin, Shadow, Snowball, Smokey or Mittens |
 | **Layout** | **Normal**, or **Wide** (one short row, handy when a game's HUD is in the way) |
@@ -98,10 +98,10 @@ In a web browser, go to **http://localhost:8080/** and open **Settings**. Your c
 | **Squish buttons** | Every button squishes and bulges a little when pressed. Bun and Cat only. Off by default |
 | **Theme** | Colour themes for the controller: Default, High contrast, Night or Pastel |
 | **Calm mode** | Stops all motion: no bounce, wobble, ear folds or trigger bulge. Shapes still change. Good for viewers who get overstimulated |
-| **Auto-hide when idle** | Fades the controller out after 8 seconds with no input, and brings it back on the next press |
-| **Input history** | Shows the last four buttons pressed, in the corner of the overlay |
+| **Auto-hide when idle** | Fades the controller out after a set time with no input, and brings it back on the next press. **Hide after** sets that time, from 2 to 60 seconds (8 by default) |
+| **Input history** | Shows the last seven buttons pressed, in the corner of the overlay |
 | **Stick trail** | Faint dots that trail each stick cap as it moves |
-| **Advanced settings** | Shows the rarer rows (shadow, frame rate, capture delay, stick deadzone, bulge and squish). Off by default; this browser remembers the choice |
+| **Settings groups** | The panel opens on Look only; Motion, On screen, Signal and Presets are one click away (+ / −). Every setting is still there, and this browser remembers which groups you left open |
 | **Presets, export and reset** | Save named looks, export and import a look as a JSON file, or reset everything to the defaults. **Copy look URL** makes a link that pins one OBS scene to one look |
 | **Signal** | Shows packets per second from the bridge, time since the last packet, and presses per second |
 | **Button names** | Names the triggers and bumpers: LT / RT and LB / RB on the Xbox look, L2 / R2 and L1 / R1 on the PlayStation look. Triggers show their name in Squeeze mode only, since the level meter fills their box. On by default |

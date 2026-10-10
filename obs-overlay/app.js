@@ -5,15 +5,14 @@
 (function () {
   'use strict';
 
-  const config = { delayMs: 0, deadzone: 0.06, deviceKind: null, shadow: 0, fps: 60, trigger: 'level', bulge: true, squish: false, names: true, opacity: 100, calm: false, theme: 'default', trail: false, autohide: false, history: false };
+  const config = { delayMs: 0, deadzone: 0.06, deviceKind: null, shadow: 0, fps: 60, trigger: 'level', bulge: true, squish: false, names: true, opacity: 100, calm: false, theme: 'default', trail: false, autohide: false, hideAfter: 8, shake: false, history: false };
   // Every look field: what the bridge stores, what Export and presets save, and what this browser remembers.
-  const LOOK_KEYS = ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source', 'shadow', 'fps', 'trigger', 'bulge', 'squish', 'names', 'opacity', 'calm', 'theme', 'trail', 'autohide', 'history'];
-  const DEFAULT_LOOK = { style: 'classic', coat: 'pumpkin', tone: 'default', layout: 'normal', pad: true, controller: 'auto', source: 'auto', shadow: 0, fps: 60, trigger: 'level', bulge: true, squish: false, names: true, opacity: 100, calm: false, theme: 'default', trail: false, autohide: false, history: false };
+  const LOOK_KEYS = ['style', 'coat', 'tone', 'layout', 'pad', 'controller', 'source', 'shadow', 'fps', 'trigger', 'bulge', 'squish', 'names', 'opacity', 'calm', 'theme', 'trail', 'autohide', 'hideAfter', 'shake', 'history'];
+  const DEFAULT_LOOK = { style: 'classic', coat: 'pumpkin', tone: 'default', layout: 'normal', pad: true, controller: 'auto', source: 'auto', shadow: 0, fps: 60, trigger: 'level', bulge: true, squish: false, names: true, opacity: 100, calm: false, theme: 'default', trail: false, autohide: false, hideAfter: 8, shake: false, history: false };
   const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, config[k]]));
   const storeKey = (k) => 'pad' + k[0].toUpperCase() + k.slice(1);
   const stateQueue = []; // FIFO buffer that delays input to match capture-card lag
   let lastActive = performance.now(); // last time a button or stick or trigger moved (auto-hide counts from here)
-  const AUTO_HIDE_MS = 8000;
 
   const $ = (id) => document.getElementById(id);
   const statusBadge = $('connectionStatus');
@@ -25,6 +24,7 @@
   const deadzoneVal = $('deadzoneVal');
   const simulatorToggle = $('simulatorToggle');
   const mashToggle = $('mashToggle');
+  const shakePreviewBtn = $('shakePreviewBtn');
   const styleInput = $('styleInput');
   const coatInput = $('coatInput');
   const coatRow = $('coatRow');
@@ -43,16 +43,32 @@
   const fpsVal = $('fpsVal');
   const opacityInput = $('opacityInput');
   const opacityVal = $('opacityVal');
+  const hideAfterInput = $('hideAfterInput');
+  const hideAfterVal = $('hideAfterVal');
   const squeezeToggle = $('squeezeToggle');
   const bulgeToggle = $('bulgeToggle');
   const squishToggle = $('squishToggle');
   const namesToggle = $('namesToggle');
-  const advancedToggle = $('advancedToggle');
+  const coatLabel = $('coatLabel');
+  const hideAfterRow = $('hideAfterRow');
   const historyBox = $('history');
   const statLine = $('statLine');
 
   // Segmented buttons mirror each <select data-seg>: the select stays the source of truth.
-  const COAT_DOT = { pumpkin: '#d9822b', shadow: '#2b2b33', snowball: '#e6e6ee', smokey: '#7d8794', mittens: '#e3d2b2' };
+  const COAT_DOT = {
+    pumpkin: '#d9822b', shadow: '#2b2b33', snowball: '#e6e6ee', smokey: '#7d8794', mittens: '#e3d2b2',
+    redfox: '#d9651e', snowfox: '#eef2f7', silverfox: '#8f98a6', fennec: '#e8c9a0',
+    golden: '#d9a24a', chocolate: '#7a4a2e', husky: '#9aa5b5', corgi: '#e0903c',
+    greywolf: '#6c7a8e', blackwolf: '#2e3140', whitewolf: '#e3e9f1', timberwolf: '#8a6d4f'
+  };
+  // The furries that pick a coat: each style's coats (the first is its default) and the name shown above them.
+  const COAT_SETS = {
+    cat: ['pumpkin', 'shadow', 'snowball', 'smokey', 'mittens'], fox: ['redfox', 'snowfox', 'silverfox', 'fennec'],
+    dog: ['golden', 'chocolate', 'husky', 'corgi'], wolf: ['greywolf', 'blackwolf', 'whitewolf', 'timberwolf']
+  };
+  const COAT_NAME = { pumpkin: 'Pumpkin', shadow: 'Shadow', snowball: 'Snowball', smokey: 'Smokey', mittens: 'Mittens', redfox: 'Red', snowfox: 'Snow', silverfox: 'Silver', fennec: 'Fennec', golden: 'Golden', chocolate: 'Chocolate', husky: 'Husky', corgi: 'Corgi', greywolf: 'Grey', blackwolf: 'Black', whitewolf: 'White', timberwolf: 'Timber' };
+  const coatStyleOf = (coat) => Object.keys(COAT_SETS).find((st) => COAT_SETS[st].includes(coat));
+  coatInput.replaceChildren(...Object.values(COAT_SETS).flat().map((c) => new Option(COAT_NAME[c], c)));
   const segSelects = [...document.querySelectorAll('select[data-seg]')];
   segSelects.forEach((sel) => {
     const box = document.createElement('div');
@@ -62,6 +78,7 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.v = o.value;
+      btn.hidden = false;
       btn.setAttribute('role', 'radio');
       if (sel.dataset.seg === 'swatch') btn.innerHTML = `<i style="--dot:${COAT_DOT[o.value]}"></i>`;
       btn.append(o.textContent);
@@ -74,7 +91,10 @@
     sel.hidden = true;
     sel.seg = box;
   });
-  const syncSegs = () => segSelects.forEach((sel) => [...sel.seg.children].forEach((b) => b.setAttribute('aria-checked', b.dataset.v === sel.value)));
+  const syncSegs = () => segSelects.forEach((sel) => [...sel.seg.children].forEach((b) => {
+    b.setAttribute('aria-checked', b.dataset.v === sel.value);
+    if (sel === coatInput) b.hidden = !(COAT_SETS[config.style] || []).includes(b.dataset.v); // only this style's coats
+  }));
 
   // Status badge: bridge link, then whether the PS4 is actually sending.
   const link = { bridge: false, ps4: false, local: null, active: null };
@@ -97,8 +117,9 @@
   const effectiveController = () => (config.controller !== 'auto' ? config.controller : ['playstation', null].includes(config.deviceKind) ? 'ps' : 'xbox');
   function applyLook(patch) {
     const l = { ...snapshot(), ...patch };
-    config.style = ['fine', 'bun', 'cat'].includes(l.style) ? l.style : 'classic';
-    config.coat = [...coatInput.options].some(o => o.value === l.coat) ? l.coat : config.coat || 'pumpkin';
+    config.style = ['fine', 'bun', 'cat', 'fox', 'dog', 'wolf'].includes(l.style) ? l.style : 'classic';
+    const coats = COAT_SETS[config.style] || COAT_SETS.cat;
+    config.coat = coats.includes(l.coat) ? l.coat : coats[0]; // a coat from another style (or none) falls back to this style's first
     config.tone = l.tone === 'midnight' ? 'midnight' : 'default';
     config.layout = l.layout === 'wide' ? 'wide' : 'normal';
     config.pad = l.pad !== false && l.pad !== 'false' && l.pad !== '0';
@@ -112,6 +133,8 @@
     config.theme = ['contrast', 'night', 'pastel'].includes(l.theme) ? l.theme : 'default';
     config.trail = l.trail === true || l.trail === 'true'; // faint dots behind the stick caps
     config.autohide = l.autohide === true || l.autohide === 'true'; // fade out after a quiet spell
+    config.shake = l.shake === true || l.shake === 'true'; // optional: a hard shake makes the pad bounce (off by default)
+    setHideAfter(Math.min(60, Math.max(2, Math.round(Number(l.hideAfter) || 8)))); // seconds of no input before that fade, 2-60
     config.history = l.history === true || l.history === 'true'; // last few presses in the corner
     setShadow(Math.min(100, Math.max(0, Math.round(Number(l.shadow) || 0))));
     setFps(Math.min(60, Math.max(5, Math.round(Number(l.fps) || 60))));
@@ -120,7 +143,9 @@
     styleInput.value = config.style; coatInput.value = config.coat; toneInput.value = config.tone; themeInput.value = config.theme;
     layoutInput.value = config.layout; controllerInput.value = config.controller; sourceInput.value = config.source; padToggle.checked = config.pad; squeezeToggle.checked = config.trigger === 'squeeze'; bulgeToggle.checked = config.bulge; squishToggle.checked = config.squish; namesToggle.checked = config.names;
     document.querySelectorAll('input[data-look]').forEach((el) => { el.checked = !!config[el.dataset.look]; });
-    coatRow.hidden = config.style !== 'cat';
+    coatRow.hidden = !COAT_SETS[config.style];
+    coatLabel.textContent = `Which ${config.style}`;
+    hideAfterRow.hidden = !config.autohide;
     toneRow.hidden = config.style !== 'fine';
     padLabel.textContent = ctrl === 'xbox' ? 'Guide button' : 'Touchpad';
     syncSegs();
@@ -158,10 +183,17 @@
     refreshStage();
   }
 
+  // Seconds of no input before auto-hide fades the controller out, 2 to 60 s (8 by default).
+  function setHideAfter(sec) {
+    config.hideAfter = sec;
+    hideAfterInput.value = sec;
+    hideAfterVal.textContent = `${sec} s`;
+  }
+
   // The controller's opacity, or 0 while auto-hide has it faded out after a quiet spell. Only the value that changed is written.
   let stageTarget = null;
   function refreshStage() {
-    const hidden = config.autohide && performance.now() - lastActive > AUTO_HIDE_MS;
+    const hidden = config.autohide && performance.now() - lastActive > config.hideAfter * 1000;
     const target = hidden ? '0' : config.opacity < 100 ? String(config.opacity / 100) : '';
     if (target === stageTarget) return;
     stageTarget = target;
@@ -169,14 +201,16 @@
     stageCanvas.style.opacity = target;
   }
 
-  // Advanced settings show the rarer rows. The choice is per browser, not sent to OBS.
-  function setAdvanced(on) {
-    document.body.classList.toggle('simple', !on);
-    advancedToggle.checked = on;
-    try { localStorage.setItem('padAdvanced', on ? 'true' : 'false'); } catch (e) { /* storage blocked */ }
-  }
+  // Settings groups: Look starts open, the rest closed. Which ones are open is remembered per browser, not sent to OBS.
+  const groups = [...document.querySelectorAll('details.grp')];
+  let openGroups = null;
+  try { openGroups = JSON.parse(localStorage.getItem('padGroups')); } catch (e) { /* storage blocked or never saved */ }
+  if (Array.isArray(openGroups)) groups.forEach((g) => { g.open = openGroups.includes(g.dataset.grp); });
+  groups.forEach((g) => g.addEventListener('toggle', () => {
+    try { localStorage.setItem('padGroups', JSON.stringify(groups.filter((x) => x.open).map((x) => x.dataset.grp))); } catch (e) { /* storage blocked */ }
+  }));
 
-  // URL params: hideUI=1 (or obs), delay=0..500, deadzone=0..0.5, layout=normal|wide, touchpad=0, controller=auto|ps|xbox, preset=classic|fine|bun|fine-midnight|pumpkin|shadow|snowball|smokey|mittens, style=classic|fine|bun|cat, cat=pumpkin|shadow|snowball|smokey|mittens, demo=1 (or sim=1), look=<base64 look from Copy look URL>.
+  // URL params: hideUI=1 (or obs), delay=0..500, deadzone=0..0.5, layout=normal|wide, touchpad=0, controller=auto|ps|xbox, preset=classic|fine|bun|fox|dog|wolf|fine-midnight|any coat name (pumpkin, redfox, golden, greywolf ...), style=classic|fine|bun|cat|fox|dog|wolf, cat=<coat name> (any furry's coat works), demo=1 (or sim=1), look=<base64 look from Copy look URL>.
   // Any other param (e.g. an old theme=) is ignored.
   function parseUrlParams() {
     const params = new URLSearchParams(window.location.search);
@@ -196,9 +230,9 @@
     try { for (const k of LOOK_KEYS) saved[k] = localStorage.getItem(storeKey(k)); } catch (e) { /* storage blocked */ }
     // ?preset=pumpkin (or classic / fine / bun) is a one-word shortcut; ?style= / ?cat= still work. Any of them pins this page.
     const preset = params.get('preset');
-    const isCoat = (p) => [...coatInput.options].some(o => o.value === p);
+    const isCoat = (p) => !!coatStyleOf(p);
     const fineMidnight = preset === 'fine-midnight';
-    const urlStyle = preset ? (isCoat(preset) ? 'cat' : fineMidnight ? 'fine' : preset) : params.get('style');
+    const urlStyle = preset ? (isCoat(preset) ? coatStyleOf(preset) : fineMidnight ? 'fine' : preset) : params.get('style');
     const urlLayout = params.get('layout'), urlPad = params.get('touchpad'), urlController = params.get('controller');
     config.pinned = !!(urlStyle || urlLayout || urlPad || urlController); // a URL-pinned page ignores the live look from the bridge
     applyLook({
@@ -230,13 +264,14 @@
   fpsInput.addEventListener('change', () => sendLook());
   opacityInput.addEventListener('input', (e) => applyLook({ opacity: e.target.value })); // live preview while dragging
   opacityInput.addEventListener('change', () => sendLook()); // send once on release, so OBS follows
+  hideAfterInput.addEventListener('input', (e) => applyLook({ hideAfter: e.target.value }));
+  hideAfterInput.addEventListener('change', () => sendLook());
   squeezeToggle.addEventListener('change', () => { applyLook({ trigger: squeezeToggle.checked ? 'squeeze' : 'level' }); sendLook(); });
   bulgeToggle.addEventListener('change', () => { applyLook({ bulge: bulgeToggle.checked }); sendLook(); });
   squishToggle.addEventListener('change', () => { applyLook({ squish: squishToggle.checked }); sendLook(); });
   namesToggle.addEventListener('change', () => { applyLook({ names: namesToggle.checked }); sendLook(); });
   // Switches marked data-look (calm, trail, auto-hide, history) follow the same path: apply, then send.
   document.querySelectorAll('input[data-look]').forEach((el) => el.addEventListener('change', () => { applyLook({ [el.dataset.look]: el.checked }); sendLook(); }));
-  advancedToggle.addEventListener('change', () => setAdvanced(advancedToggle.checked));
 
   // Test mode runs on the bridge so every client (including OBS) receives it.
   // The chosen look lives on the bridge, so every page (OBS included) follows it with no URL changes.
@@ -270,6 +305,7 @@
     if (on && !mashTimer) mashTimer = setInterval(mashTick, 16);
     if (!on && mashTimer) { clearInterval(mashTimer); mashTimer = null; MASH_BUTTONS.forEach((n) => { mashLeft[n] = 0; }); }
   }
+  shakePreviewBtn.addEventListener('click', () => window.RetroPad.shake()); // this page only: OBS shakes on a real shake
   mashToggle.addEventListener('change', () => {
     if (mashToggle.checked && !simulatorToggle.checked) { simulatorToggle.checked = true; sendSim(); }
     setMash(mashToggle.checked); showStatus();
@@ -302,7 +338,7 @@
     const b = state.buttons || {};
     const names = effectiveController() === 'xbox' ? LABELS_XBOX : LABELS_PS;
     for (const k of Object.keys(b)) {
-      if (b[k] && !prevPressed[k]) { presses++; pressLog.push(names[k] || k.toUpperCase()); if (pressLog.length > 4) pressLog.shift(); }
+      if (b[k] && !prevPressed[k]) { presses++; pressLog.push(names[k] || k.toUpperCase()); if (pressLog.length > 7) pressLog.shift(); }
     }
     prevPressed = b;
     const a = state.axes || {}, t = state.triggers || {};
@@ -310,6 +346,21 @@
     if (moved > 0.05 || Object.values(b).some(Boolean)) lastActive = performance.now();
     historyBox.hidden = !config.history;
     if (config.history) historyBox.textContent = pressLog.join('  ·  ');
+    noteMotion(state.motion);
+  }
+
+  // Shake detection (optional, off by default): a hard shake is a run of acceleration samples above SHAKE_LEVEL.
+  // The PS4 SDK's acceleration isn't in g: a resting pad reads under 1, a hard shake reads about 7 to 18 (measured 2026-10-09).
+  const SHAKE_LEVEL = 4, SHAKE_SAMPLES = 4, SHAKE_GAP_MS = 1500;
+  let shakeRun = 0, lastShake = -Infinity;
+  function noteMotion(m) {
+    if (!config.shake || config.calm || !m || !m.accel) return;
+    const [x, y, z] = m.accel;
+    shakeRun = Math.hypot(x, y, z) > SHAKE_LEVEL ? shakeRun + 1 : 0;
+    if (shakeRun >= SHAKE_SAMPLES && performance.now() - lastShake > SHAKE_GAP_MS) {
+      lastShake = performance.now(); shakeRun = 0;
+      window.RetroPad.shake();
+    }
   }
   setInterval(() => {
     statLine.textContent = lastPacket ? `${packets}/s · last ${Math.round(performance.now() - lastPacket)} ms ago · ${presses} presses/s` : 'no packets yet';
@@ -437,13 +488,12 @@
     importFile.value = '';
   });
 
-  // Reset: back to the default look, delay and deadzone. The advanced view and Test mode are left alone.
+  // Reset: back to the default look, delay and deadzone. Test mode is left alone.
   $('resetBtn').addEventListener('click', () => {
     applyLook(DEFAULT_LOOK); setDelay(0); setDeadzone(0.06); sendLook();
   });
 
   refreshPresets();
-  setAdvanced(localStorage.getItem('padAdvanced') === 'true');
   parseUrlParams();
   if (!document.body.classList.contains('hide-ui')) settingsPanel.classList.add('open');
   connectWebSocket();

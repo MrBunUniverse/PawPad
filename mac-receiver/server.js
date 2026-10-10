@@ -47,6 +47,7 @@ const readOverlayFile = (name) => sea
 // ---------------------------------------------------------------
 const PAD_STREAM_MAGIC = 0x50533450; // 'PS4P'
 const PACKET_MIN_SIZE = 18;
+const MOTION_PACKET_SIZE = 44; // 20-byte header plus accel and gyro (3 floats each); shorter packets come from older plugins
 const BUTTON_MASKS = {
     share: 0x00000001, l3: 0x00000002, r3: 0x00000004, options: 0x00000008,
     dpad_up: 0x00000010, dpad_right: 0x00000020, dpad_down: 0x00000040, dpad_left: 0x00000080,
@@ -140,7 +141,7 @@ wss.on('connection', (ws) => {
         let m;
         try { m = JSON.parse(raw); } catch (e) { return; }
         if (m && m.type === 'look') {
-            if (!['classic', 'fine', 'bun', 'cat'].includes(m.style) || !/^[a-z]{2,12}$/.test(m.coat)) return;
+            if (!['classic', 'fine', 'bun', 'cat', 'fox', 'dog', 'wolf'].includes(m.style) || !/^[a-z]{2,12}$/.test(m.coat)) return;
             // Unknown look fields pass through, so a new switch needs no bridge change to reach OBS.
             look = {
                 ...m, type: 'look', style: m.style, coat: m.coat, tone: m.tone === 'midnight' ? 'midnight' : 'default',
@@ -239,7 +240,12 @@ udp.on('message', (msg, rinfo) => {
         buttons,
         axes: { lx_norm: axis(12), ly_norm: axis(13), rx_norm: axis(14), ry_norm: axis(15) },
         triggers: { l2_norm: msg[16] / 255, r2_norm: msg[17] / 255 },
-        touch: { active: msg.length > 18 && msg[18] === 1 }
+        touch: { active: msg.length > 18 && msg[18] === 1 },
+        // Motion: accel then gyro, three little-endian floats each, at byte 20. Older plugins send 20 bytes, so no motion.
+        motion: msg.length >= MOTION_PACKET_SIZE ? {
+            accel: [msg.readFloatLE(20), msg.readFloatLE(24), msg.readFloatLE(28)],
+            gyro: [msg.readFloatLE(32), msg.readFloatLE(36), msg.readFloatLE(40)]
+        } : null
     });
 });
 

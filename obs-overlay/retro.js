@@ -1,6 +1,6 @@
 /**
  * Pixel-art controller, drawn rect by rect on a canvas (no images, no smoothing).
- * Looks: classic / fine (2x denser grid) / cat; layouts: normal / wide.
+ * Looks: classic / fine (2x denser grid) / bun / cat / fox / dog / wolf; layouts: normal / wide.
  * Every button has two states (idle / pressed); L2 and R2 show analog pressure
  * as a bar meter plus a 0-100 readout (level), or as a button that squeezes down (squeeze).
  * Bun and Cat can also bulge the squeezed triggers (bulge) and squish every pressed button (squish).
@@ -37,7 +37,7 @@
     on: '#fcd000', onHi: '#ffffff', onLo: '#fcb000',      // "pressed" colours of bumpers, pills, d-pad arms
     tri: '#43b047', cir: '#ff4d6d', crs: '#2e8bff', sqr: '#ff5fc4', yel: '#fcd000', // face button colours
     m1: '#43b047', m2: '#fcd000', m3: '#e52521',          // L2/R2 meter: low / mid / high
-    pad: null, padHi: null, padLo: null, blush: '#f2a39a', earIn: '#f0c4b8'
+    pad: null, padHi: null, padLo: null, blush: '#f2a39a', earIn: '#f0c4b8', paw: null, tip: null, earOut: null
   };
   const BASE = { ...C };
   // Colour themes: they override the palette of the current look. "default" keeps the look's own colours.
@@ -56,6 +56,31 @@
     mittens: { gray: '#e3d2b2', grayHi: '#f6ead2', grayLo: '#a88f68', bean: '#e58f9d',
       capFill: '#6b4f3a', capHi: '#8f705a', capLo: '#3f2c20', text: '#4a3a2a' }
   };
+  // Fox, dog and wolf coats. Extra keys: bean = ear inside, paw = the paw on the stick cap, tip = dark ear tips (fox, wolf),
+  // earOut / earIn = floppy dog ears (outside / inside).
+  const FOX_COATS = {
+    redfox: { gray: '#d9651e', grayHi: '#f2995a', grayLo: '#8a3a10', bean: '#f7e6cc', paw: '#3b2a24', tip: '#2e211c' },
+    snowfox: { gray: '#eef2f7', grayHi: '#ffffff', grayLo: '#aab6c6', bean: '#ffb7c5', paw: '#7f90a8', tip: '#5b6678', text: '#3a4a5a' },
+    silverfox: { gray: '#8f98a6', grayHi: '#c3cad6', grayLo: '#515a68', bean: '#d9dde5', paw: '#2d3240', tip: '#232834' },
+    fennec: { gray: '#e8c9a0', grayHi: '#f8e6c8', grayLo: '#a98558', bean: '#f0a8a0', paw: '#b07a4c', tip: '#a98558', text: '#5a4026' }
+  };
+  const DOG_COATS = {
+    golden: { gray: '#d9a24a', grayHi: '#f0c978', grayLo: '#8c6420', earOut: '#b8791f', earIn: '#e2b06a', paw: '#f2a39a' },
+    chocolate: { gray: '#7a4a2e', grayHi: '#a8734f', grayLo: '#3f2314', earOut: '#4f2d1a', earIn: '#8c5a3a', paw: '#e6a58f' },
+    husky: { gray: '#9aa5b5', grayHi: '#e8edf4', grayLo: '#4f5868', earOut: '#4a515f', earIn: '#8b94a6', paw: '#f2c9c9' },
+    corgi: { gray: '#e0903c', grayHi: '#f7c27e', grayLo: '#9a5a1c', earOut: '#c97424', earIn: '#f0b878', paw: '#fff1de' }
+  };
+  const WOLF_COATS = {
+    greywolf: { gray: '#6c7a8e', grayHi: '#a3b2c6', grayLo: '#3a4658', bean: '#c7d6ea', paw: '#cfe0f5', tip: '#232b38' },
+    blackwolf: { gray: '#2e3140', grayHi: '#5b6078', grayLo: '#14151e', bean: '#8fa4d8', paw: '#8fa4d8', tip: '#0b0c12' },
+    whitewolf: { gray: '#e3e9f1', grayHi: '#ffffff', grayLo: '#a2b0c3', bean: '#b9d3f0', paw: '#9fc2e8', tip: '#7f90a8', text: '#3a4a5a' },
+    timberwolf: { gray: '#8a6d4f', grayHi: '#b99a77', grayLo: '#4e3a26', bean: '#e3c9a8', paw: '#e3c9a8', tip: '#2f2318' }
+  };
+  // Every furry with a coat: the style it belongs to and its colours. The first coat of each style is its default.
+  const SPECIES = {
+    cat: Object.keys(COATS), fox: Object.keys(FOX_COATS), dog: Object.keys(DOG_COATS), wolf: Object.keys(WOLF_COATS)
+  };
+  const ALL_COATS = { ...COATS, ...FOX_COATS, ...DOG_COATS, ...WOLF_COATS };
   // Bun preset: the Mr Bun tiramisu bunny (cream body, cocoa outlines, coral touchpad, ochre eyes).
   const BUN = {
     ink: '#4a3228', gray: '#efe6d6', grayHi: '#fbf6ec', grayLo: '#cdb999', dim: '#b9a688', text: '#5a3d33', empty: '#6b5043',
@@ -144,16 +169,16 @@
   const EAR_SMALL = makeEar([-0.5, -5.5], [-4, -3], 1.9, 1.3);
   // Xbox cat: two tilted triangle ears that rise out from behind the round Guide button (it is drawn on top of
   // their bases), so they wrap around its upper corners instead of floating beside it. Left ear shown; the right one mirrors it.
-  const catEarShape = (outer, inner) => {
+  const catEarShape = (outer, inner, tipY) => {
     const S = 0.5, cells = new Map();
     const inTri = (px, py, a, b, c) => {
       const d = (p, q, r) => (p[0] - r[0]) * (q[1] - r[1]) - (q[0] - r[0]) * (p[1] - r[1]);
       const d1 = d([px, py], a, b), d2 = d([px, py], b, c), d3 = d([px, py], c, a);
       return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
     };
-    for (let y = -8; y <= 1; y += S) for (let x = -6; x <= 4; x += S) {
+    for (let y = -11; y <= 1; y += S) for (let x = -6; x <= 4; x += S) {
       if (!inTri(x + S / 2, y + S / 2, ...outer)) continue;
-      cells.set(x + ',' + y, inTri(x + S / 2, y + S / 2, ...inner) ? 'in' : 'fur');
+      cells.set(x + ',' + y, inTri(x + S / 2, y + S / 2, ...inner) ? 'in' : tipY !== undefined && y + S / 2 < tipY ? 'tip' : 'fur');
     }
     const list = [...cells].map(([k, v]) => [...k.split(',').map(Number), v]);
     const outline = new Set();
@@ -169,10 +194,29 @@
   // PlayStation, touchpad pressed: the same ears, shorter and bent down and out.
   const CAT_EAR_PS_DOWN = catEarShape([[-3.6, 0.5], [3.0, 0.5], [-5.6, -3.5]], [[-3.2, 0], [-0.6, 0], [-4.6, -2.8]]);
 
+  // Fox: taller, sharper ears with dark tips. Wolf: tall, narrow, upright ears with dark tips. Same three poses as the cat.
+  const TRI = {
+    cat: { ps: CAT_EAR_PS, down: CAT_EAR_PS_DOWN, x: CAT_EAR_X },
+    fox: {
+      ps: catEarShape([[-3.8, 0.5], [3.0, 0.5], [-4.4, -9.5]], [[-3.2, 0], [-0.8, 0], [-3.9, -6.6]], -6.8),
+      down: catEarShape([[-3.8, 0.5], [3.0, 0.5], [-6.2, -4.5]], [[-3.2, 0], [-0.8, 0], [-5.0, -3.2]], -3.2),
+      x: catEarShape([[-2.8, 0.5], [2.4, 0.5], [-3.8, -6.5]], [[-2.4, 0], [-0.6, 0], [-3.3, -4.4]], -4.4)
+    },
+    wolf: {
+      ps: catEarShape([[-3.2, 0.5], [2.6, 0.5], [-3.2, -9]], [[-2.7, 0], [-0.7, 0], [-3.0, -6.6]], -6.6),
+      down: catEarShape([[-3.2, 0.5], [2.6, 0.5], [-5.4, -4.5]], [[-2.7, 0], [-0.7, 0], [-4.4, -3.2]], -3.2),
+      x: catEarShape([[-2.6, 0.5], [2.2, 0.5], [-3.0, -6.2]], [[-2.2, 0], [-0.6, 0], [-2.8, -4.2]], -4.2)
+    }
+  };
+  // Dog: floppy ears that hang down beside the pad (the tube shape bun uses, but short and heavy).
+  const DOG_NORMAL = makeEar([-9, -2], [-8, 9], 3.4, 2.6);
+  const DOG_WIDE = makeEar([-5, -1], [-4.5, 6], 3.0, 2.4);
+  const DOG_SMALL = makeEar([-3.2, -0.5], [-3.2, 4], 1.9, 1.5);
+
   // Cat ears: anchors [x, mirror] on row y. The first anchor is the left ear, the second the right one, and each folds with its bumper.
   // The Xbox Guide uses CAT_EAR_X; the PlayStation pad passes its own shape.
   const catEars = (anchors, y, shape = CAT_EAR_X) => anchors.forEach(([ax, m], i) =>
-    drawEar(shape, ax, y, m, foldAngle(i === 0 ? 'left' : 'right'), 1, { ink: C.ink, out: C.gray, in: C.bean }));
+    drawEar(shape, ax, y, m, foldAngle(i === 0 ? 'left' : 'right'), 1, { ink: C.ink, out: C.gray, in: C.bean, tip: C.tip || C.gray }));
 
   // Touchpad press (finger down or button click): the ears pop up and settle in a few stepped frames.
   // Very small on purpose (a pixel or two): pushing down squashes the ears a hair, letting go pops them back up a hair.
@@ -195,6 +239,54 @@
       draw(...last); // the frame index is part of the repaint key, so a new frame always redraws
     }, 30);
   }
+  // Shake (optional, off by default; app.js calls shake() on a hard shake or from the preview button): every part of the pad
+  // drops into a damped bounce, like a button press: it snaps up, overshoots and settles, eased out at the end.
+  // Calm mode turns it off.
+  const SHAKE_MS = 300; // length of the whole shake: full strength first, then eased out to nothing at the end
+  const SHAKE_DECAY = 6; // how fast the bounce itself dies down, per second (the ease-out does the final landing)
+  let shakeStart = 0, shakeTimer = null, shakeMix = {};
+  // Each part (button, trigger, bumper, stick, d-pad arm) gets its own bounce on every shake: size, bounces per second,
+  // how fast it dies down and where in the bounce it starts. Different intervals make the pad ripple out of step.
+  const randomBounce = () => ({
+    units: 2 + Math.random() * 4,           // biggest jump, in whole units (2 to 6)
+    hz: 4 + Math.random() * 5,              // bounces per second (4 to 9), so a few wobbles fit in 0.3 s
+    decay: 4 + Math.random() * 4,           // how fast this part's bounce dies down (4 to 8 per second)
+    lag: (Math.random() * 2 - 1) * Math.PI, // starting point anywhere in a bounce, so some parts dip first
+    side: Math.random()                     // sideways share of the jump (0 to 1)
+  });
+  // The shake holds full strength for the first 60% of its length, then eases out to zero with a smoothstep (no jump at the end).
+  const SHAKE_EASE_FROM = 0.6;
+  const shakeFade = () => {
+    if (!shakeStart || calm) return 0;
+    const x = (performance.now() - shakeStart) / SHAKE_MS;
+    if (x >= 1) return 0;
+    if (x <= SHAKE_EASE_FROM) return 1;
+    const s = (x - SHAKE_EASE_FROM) / (1 - SHAKE_EASE_FROM);
+    return 1 - s * s * (3 - 2 * s);
+  };
+  const shakeLevel = () => { // 0 once the shake is over (also drives the repaint key and when the timer stops)
+    const fade = shakeFade();
+    return fade ? fade * Math.exp(-SHAKE_DECAY * (performance.now() - shakeStart) / 1000) : 0;
+  };
+  const shakeOffset = (name) => {
+    const fade = shakeFade();
+    if (!fade) return [0, 0];
+    const m = shakeMix[name] || (shakeMix[name] = randomBounce());
+    const t = (performance.now() - shakeStart) / 1000, a = fade * Math.exp(-m.decay * t);
+    const w = 2 * Math.PI * m.hz * t + m.lag;
+    return [Math.round(m.units * m.side * a * Math.cos(w * 0.5)), Math.round(-m.units * a * Math.cos(w))]; // up first, then down past rest, then settle
+  };
+  function shake() {
+    if (calm) return;
+    shakeStart = performance.now();
+    shakeMix = {}; // a new shake rolls new numbers for every group
+    if (shakeTimer) return;
+    shakeTimer = setInterval(() => {
+      if (!shakeLevel()) { clearInterval(shakeTimer); shakeTimer = null; }
+      draw(...last); // the shake level is part of the repaint key, so each frame redraws (and the last one settles)
+    }, 16); // about 60 redraws a second, so a 0.3 s shake stays smooth
+  }
+
   // Ear fold: each ear folds about its base, the tip falling outward and down, as PawKey's mouse ears do. L1 folds the left
   // ear and R1 the right one. The ear stays folded while the bumper is held and springs back on release.
   const FOLD_PRESS = { seq: [0.1, 0.27, 0.2], hold: 0.2 }, FOLD_RELEASE = { seq: [0.12, -0.05, 0.02], hold: 0 }; // radians per 50 ms frame
@@ -242,7 +334,7 @@
     };
     const pick = (tx, ty) => {
       const kind = sourceAt(tx, ty);
-      if (kind) return kind === 'in' ? fill.in : fill.out;
+      if (kind) return kind === 'in' ? fill.in : kind === 'tip' ? fill.tip : fill.out;
       if ((sourceAt(tx - 1, ty) && sourceAt(tx + 1, ty)) || (sourceAt(tx, ty - 1) && sourceAt(tx, ty + 1))) return fill.out;
       return (sourceAt(tx + 1, ty) || sourceAt(tx - 1, ty) || sourceAt(tx, ty + 1) || sourceAt(tx, ty - 1)) ? fill.ink : null;
     };
@@ -256,16 +348,17 @@
   }
   function ears(by, half = 12) { // half = distance of each ear base from the centre (80)
     const f = boingFrame(), sy = f < 0 ? 1 : boingSeq[f];
-    const ear = xbox ? EAR_SMALL : wideLayout ? EAR_WIDE : EAR_NORMAL;
+    const dog = species === 'dog';
+    const ear = dog ? (xbox ? DOG_SMALL : wideLayout ? DOG_WIDE : DOG_NORMAL) : xbox ? EAR_SMALL : wideLayout ? EAR_WIDE : EAR_NORMAL;
     [[80 - half, 1, 'left'], [80 + half, -1, 'right']].forEach(([bx, m, side]) =>
-      drawEar(ear, bx, by, m, foldAngle(side), sy, { ink: C.ink, out: C.gray, in: C.earIn }));
+      drawEar(ear, bx, by, m, foldAngle(side), sy, { ink: C.ink, out: dog ? C.earOut || C.gray : C.gray, in: C.earIn }));
   }
 
   const canvas = document.getElementById('retroCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   // P = size of one drawn pixel in logical units: 1 = classic, 0.5 = fine (2x denser grid).
-  let P = 1, last = [], lastKey = null, cat = false, bun = false, themed = false, squeeze = false, bulgeFx = false, squishFx = false, nameOn = true;
+  let P = 1, last = [], lastKey = null, cat = false, bun = false, species = null, themed = false, squeeze = false, bulgeFx = false, squishFx = false, nameOn = true;
   let calm = false, trail = false; // calm: no motion at all; trail: faint dots behind each stick cap
   const trails = { ls: [], rs: [] };
   function setStyle(name, coat, tone, layout, pad, controller, triggerLook, bulge, squish, names, opts = {}) {
@@ -281,17 +374,18 @@
       ['rs', 'options', 'face', 'rt'].forEach(n => { G[n] = [G[n][0] - gap, G[n][1]]; });
       W -= gap;
     }
-    cat = name === 'cat';
+    species = SPECIES[name] ? name : null; // cat, fox, dog or wolf: the furries that pick a coat
+    cat = !!species; // all four share the cat's paw-print caps and ears that fold with the bumpers
     bun = name === 'bun';
-    const stylised = cat || bun; // only Bun and Cat take the bulge and squish effects; Classic and Fine never do
+    const stylised = cat || bun; // only the furries take the bulge and squish effects; Classic and Fine never do
     calm = !!opts.calm; trail = !!opts.trail;
     bulgeFx = stylised && bulge !== false && !calm;
     squishFx = stylised && squish === true && !calm;
     nameOn = names !== false;
-    if (bun && wideLayout) { OY -= 4; H += 4; } // headroom for the ears in the one-row layout
+    if ((bun || (species && species !== 'cat')) && wideLayout) { OY -= 4; H += 4; } // headroom for the ears in the one-row layout
     themed = cat || bun || (name === 'fine' && tone === 'midnight'); // fine + midnight: the black-cat colours without the cat extras
     P = name === 'fine' || cat || bun ? 0.5 : 1;
-    Object.assign(C, BASE, cat ? COATS[coat] || COATS.pumpkin : bun ? BUN : themed ? COATS.shadow : {}, THEMES[opts.theme] || {});
+    Object.assign(C, BASE, cat ? ALL_COATS[coat] && SPECIES[species].includes(coat) ? ALL_COATS[coat] : ALL_COATS[SPECIES[species][0]] : bun ? BUN : themed ? COATS.shadow : {}, THEMES[opts.theme] || {});
     if (!C.capFill) { C.capFill = C.gray; C.capHi = C.grayHi; C.capLo = C.grayLo; }
     if (!C.dim) C.dim = C.grayHi;
     const k = 1 / P;
@@ -380,27 +474,40 @@
     disc(cx, cy, r + (blocky ? 1 : P), C.ink, blocky); disc(cx, cy, r, fill, blocky);
     rect(cx - 1, cy - r, 1 + 2 * P, P, hi); rect(cx - 1, cy + r - (P < 1 ? P : 0), 1 + 2 * P, P, lo);
   };
-  // Squish (Bun / Cat only). Each button has a spring: a press pulls it to 1 with a quick snap, and a release swings it back past
+  // Squish (Bun / Cat only). Each button has a spring that follows a press in steps (pressTarget): strike, rebound, then a slow sink
+  // while held. A release swings it back past
   // rest (down to about -0.4, a bouncy stretch) before it settles. A press the overlay skipped between two frames is latched
   // (latch), so a tap shorter than a frame still squashes. Springs step in real time, so mashing never leaves one stuck.
   const SQ_BUTTONS = ['l1', 'r1', 'share', 'options', 'touchpad', 'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right', 'l3', 'r3', 'triangle', 'circle', 'cross', 'square'];
   const SQ_PRESS = { w: 2 * Math.PI * 7, z: 0.55 }, SQ_RELEASE = { w: 2 * Math.PI * 4.5, z: 0.3 }; // stiffness (rad/s), damping ratio
   const SQ_HOLD = 80; // ms a latched press stays on
-  const sq = Object.fromEntries(SQ_BUTTONS.map(n => [n, { p: 0, v: 0, until: 0 }]));
-  let sqBusy = false, sqClock = 0;
+  const sq = Object.fromEntries(SQ_BUTTONS.map(n => [n, { p: 0, v: 0, until: 0, at: 0, held: false }]));
+  let sqBusy = false, sqHeld = false, sqClock = 0; // sqHeld: a squish button is down, so the hold keeps animating between packets
   const sn = v => Math.round(v / P) * P; // snap to the pixel grid
   const sqp = n => (squishFx ? sq[n].p : 0); // a button's squish: 0 at rest, 1 pressed, below 0 stretched
+  // A held button runs a few steps, all keeping the pressed colour: it strikes down (1.4), rebounds (1.0), then sinks slowly
+  // deeper (up to 1.6) while it stays held. The spring adds a small overshoot at each step. Release swings back out (below).
+  const pressTarget = (age) => {
+    if (age < 140) return 1.4;
+    if (age < 280) return 1.0;
+    if (age < 900) return 1.0 + 0.6 * (age - 280) / 620;
+    return 1.6;
+  };
   function stepSquish(buttons) {
     const now = performance.now();
     const dt = sqClock ? Math.min((now - sqClock) / 1000, 0.05) : 0; // capped, so a hidden overlay cannot blow a spring up
     sqClock = now;
     const steps = Math.ceil(dt * 240), h = steps ? dt / steps : 0;
-    sqBusy = false;
+    sqBusy = false; sqHeld = false;
     for (const n of SQ_BUTTONS) {
-      const s = sq[n], target = (buttons[n] || now < s.until) ? 1 : 0, k = target ? SQ_PRESS : SQ_RELEASE;
+      const s = sq[n], held = !!(buttons[n] || now < s.until);
+      if (held) sqHeld = true;
+      if (held && !s.held) s.at = now; // press onset: the held steps start here
+      s.held = held;
+      const target = held ? pressTarget(now - s.at) : 0, k = held ? SQ_PRESS : SQ_RELEASE;
       const kw = k.w * k.w, cz = 2 * k.z * k.w;
       for (let i = 0; i < steps; i++) { s.v += (-kw * (s.p - target) - cz * s.v) * h; s.p += s.v * h; }
-      s.p = Math.max(-0.4, Math.min(1.2, s.p));
+      s.p = Math.max(-0.4, Math.min(1.6, s.p));
       if (Math.abs(s.p - target) < 0.002 && Math.abs(s.v) < 0.02 && now >= s.until) { s.p = target; s.v = 0; }
       else sqBusy = true;
     }
@@ -498,7 +605,10 @@
     if (P < 1) sprite(ARROWS[dir], sn(g.x + g.w / 2), sn(g.y + g.h / 2), on ? C.brown : C.grayHi, true);
   }
 
+  // Pixel shadow: a see-through, stepped copy of a round part, dy units lower, so it reads as a layer under it.
+  const shade = (cx, cy, r, dy) => { ctx.save(); ctx.globalAlpha = 0.4; disc(cx, cy + dy, r, C.ink, true); ctx.restore(); };
   function stick(cx, cy, v, pressed, p, key) {
+    shade(cx, cy, 11, 2); // the well sits on a shadow step
     disc(cx, cy, 11, C.ink, true); disc(cx, cy, 10, C.grayLo, true);
     const tx = cx + Math.round(v.x * 4), ty = cy + Math.round(v.y * 4) + (pressed ? 1 : 0);
     if (trail) { // faint dots where the cap has been, fading with age
@@ -507,11 +617,12 @@
       h.forEach(([x, y], i) => { ctx.globalAlpha = (i + 1) / (h.length + 1) * 0.5; rect(x, y, P, P, C.dim); });
       ctx.globalAlpha = 1;
     }
+    shade(tx, ty, 7, 1); // the cap casts a thinner shadow onto the well
     if (cat) { // no light-up: the cap keeps its coat and the paw squishes instead
       ballSq(tx, ty, 6, C.capFill, C.capHi, C.capLo, p, true, 0.5);
       const paw = pressed ? PAW_SQUISH : PAW, py = ty + (pressed ? 0.5 : 0);
       sprite(paw, tx, py + P, C.capLo, true); // drop shadow makes the paw pop
-      sprite(paw, tx, py, C.bean, true);
+      sprite(paw, tx, py, C.paw || C.bean, true);
       return;
     }
     if (bun) { // no light-up: cream cap with a pink bunny paw that squishes when pressed
@@ -563,7 +674,7 @@
     // Boing once when the touchpad goes down (touch or click) and once when it comes back up; holding does nothing.
     const down = (b.touchpad && !prevClick) || (touching && !prevTouch);
     const up = (!b.touchpad && prevClick) || (!touching && prevTouch);
-    if (bun && showPad && (down || up)) startBoing(down ? BOING_DOWN : BOING_UP);
+    if ((bun || species === 'dog') && showPad && (down || up)) startBoing(down ? BOING_DOWN : BOING_UP);
     prevClick = !!b.touchpad; prevTouch = !!touching;
     // A bumper folds the ear on its side (cat and bun): L1 for the left ear, R1 for the right one.
     const l1 = !!b.l1, r1 = !!b.r1;
@@ -575,58 +686,66 @@
     // Repaint only when something visible changed (sticks move in whole units, triggers show whole percents).
     const key = [Object.values(b).join(), Math.round(left.x * 4), Math.round(left.y * 4), Math.round(right.x * 4), Math.round(right.y * 4),
       Math.round((tr.l2_norm || 0) * 100), Math.round((tr.r2_norm || 0) * 100), touching ? 1 : 0, boingFrame(),
-      Math.round(foldAngle('left') * 100), Math.round(foldAngle('right') * 100),
+      Math.round(foldAngle('left') * 100), Math.round(foldAngle('right') * 100), Math.round(shakeLevel() * 100),
       squishFx ? SQ_BUTTONS.map(n => Math.round(sq[n].p * 32)).join() : ''].join('|');
     if (key === lastKey) return;
     lastKey = key;
 
     ctx.clearRect(OX, OY, W, H);
-    const at = (name, fn) => { ctx.save(); ctx.translate(...G[name]); fn(); ctx.restore(); };
+    const at = (name, fn) => { ctx.save(); ctx.translate(...G[name]); fn(); ctx.restore(); }; // the layout position of a group
+    // Every button, trigger, bumper and stick is its own part with its own shake, so they bounce out of step.
+    const part = (key, fn) => { const [jx, jy] = shakeOffset(key); ctx.save(); ctx.translate(jx, jy); fn(); ctx.restore(); };
     // Button names follow the controller: PlayStation L2 / R2 and L1 / R1, Xbox LT / RT and LB / RB.
     const N = xbox ? { lt: 'LT', rt: 'RT', lb: 'LB', rb: 'RB' } : { lt: 'L2', rt: 'R2', lb: 'L1', rb: 'R1' };
-    at('lt', () => { trigger(22, tr.l2_norm || 0, N.lt); bumper(22, b.l1, sqp('l1'), N.lb); });
-    at('rt', () => { trigger(116, tr.r2_norm || 0, N.rt); bumper(116, b.r1, sqp('r1'), N.rb); });
+    at('lt', () => {
+      part('l2', () => trigger(22, tr.l2_norm || 0, N.lt));
+      part('l1', () => bumper(22, b.l1, sqp('l1'), N.lb));
+    });
+    at('rt', () => {
+      part('r2', () => trigger(116, tr.r2_norm || 0, N.rt));
+      part('r1', () => bumper(116, b.r1, sqp('r1'), N.rb));
+    });
 
     // PlayStation: the touchpad is a block that bounces when touched and darkens when clicked.
     // Xbox: a round Guide button (the same 'touchpad' slot). Bun / Cat ears sit on whichever it is.
     const by = !xbox && touching ? 29 : 31;
-    if (showPad) at('pad', () => {
+    if (showPad) at('pad', () => part('touchpad', () => {
       if (xbox) {
-        if (bun) ears(33, 4);
-        if (cat) catEars([[77.5, 1], [82.5, -1]], 36.5); // anchors sit inside the button's outline; the button covers the bases
+        if (bun || species === 'dog') ears(33, 4);
+        else if (cat) catEars([[77.5, 1], [82.5, -1]], 36.5, TRI[species].x); // anchors sit inside the button's outline; the button covers the bases
         guide(b.touchpad, sqp('touchpad'));
         return;
       }
-      if (bun) ears(by); // ears stay attached to the pad: they rise with it and boing on top
-      if (cat) catEars([[70, 1], [90, -1]], by + 0.5, b.touchpad ? CAT_EAR_PS_DOWN : CAT_EAR_PS); // ears behind the touchpad: its top edge covers their bases
+      if (bun || species === 'dog') ears(by); // ears stay attached to the pad: they rise with it and boing on top
+      else if (cat) catEars([[70, 1], [90, -1]], by + 0.5, b.touchpad ? TRI[species].down : TRI[species].ps); // ears behind the touchpad: its top edge covers their bases
       if (bun) pBox(64, by, 32, 14, b.touchpad ? C.padLo : C.pad, b.touchpad ? C.pad : C.padHi, C.padLo, sqp('touchpad'));
       else if (themed) pBox(64, by, 32, 14, b.touchpad ? C.grayLo : C.grayHi, b.touchpad ? C.gray : C.white, C.grayLo, sqp('touchpad'));
       else pBox(64, by, 32, 14, b.touchpad ? C.brown : C.gold, b.touchpad ? C.brown : C.yellow, C.brown, sqp('touchpad'));
-    });
+    }));
 
-    at('share', () => pill(51, 33, b.share, sqp('share')));
-    at('options', () => pill(101, 33, b.options, sqp('options')));
+    at('share', () => part('share', () => pill(51, 33, b.share, sqp('share'))));
+    at('options', () => part('options', () => pill(101, 33, b.options, sqp('options'))));
 
     at('dpad', () => {
-      arm(33, 36, 7, 8, b.dpad_up, 'up', sqp('dpad_up'));
-      arm(33, 50, 7, 8, b.dpad_down, 'down', sqp('dpad_down'));
-      arm(25, 43, 8, 7, b.dpad_left, 'left', sqp('dpad_left'));
-      arm(40, 43, 8, 7, b.dpad_right, 'right', sqp('dpad_right'));
+      part('dpad_up', () => arm(33, 36, 7, 8, b.dpad_up, 'up', sqp('dpad_up')));
+      part('dpad_down', () => arm(33, 50, 7, 8, b.dpad_down, 'down', sqp('dpad_down')));
+      part('dpad_left', () => arm(25, 43, 8, 7, b.dpad_left, 'left', sqp('dpad_left')));
+      part('dpad_right', () => arm(40, 43, 8, 7, b.dpad_right, 'right', sqp('dpad_right')));
     });
 
-    at('ls', () => stick(62, 56, left, b.l3, sqp('l3'), 'ls'));
-    at('rs', () => stick(98, 56, right, b.r3, sqp('r3'), 'rs'));
+    at('ls', () => part('ls', () => stick(62, 56, left, b.l3, sqp('l3'), 'ls')));
+    at('rs', () => part('rs', () => stick(98, 56, right, b.r3, sqp('r3'), 'rs')));
 
     at('face', () => {
-      face('triangle', 124, 36, C.tri, b.triangle, sqp('triangle'));
-      face('circle', 133, 45, C.cir, b.circle, sqp('circle'));
-      face('cross', 124, 54, C.crs, b.cross, sqp('cross'));
-      face('square', 115, 45, C.sqr, b.square, sqp('square'));
+      part('triangle', () => face('triangle', 124, 36, C.tri, b.triangle, sqp('triangle')));
+      part('circle', () => face('circle', 133, 45, C.cir, b.circle, sqp('circle')));
+      part('cross', () => face('cross', 124, 54, C.crs, b.cross, sqp('cross')));
+      part('square', () => face('square', 115, 45, C.sqr, b.square, sqp('square')));
     });
   }
 
   // Called once per overlay frame (app.js), so a squish keeps moving when no new pad state arrives.
-  function tick() { if (squishFx && sqBusy) draw(...last); }
-  window.RetroPad = { draw, setStyle, latch, tick };
+  function tick() { if (squishFx && (sqBusy || sqHeld)) draw(...last); }
+  window.RetroPad = { draw, setStyle, latch, tick, shake };
   setStyle('classic');
 })();
