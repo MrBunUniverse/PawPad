@@ -474,7 +474,7 @@
     disc(cx, cy, r + (blocky ? 1 : P), C.ink, blocky); disc(cx, cy, r, fill, blocky);
     rect(cx - 1, cy - r, 1 + 2 * P, P, hi); rect(cx - 1, cy + r - (P < 1 ? P : 0), 1 + 2 * P, P, lo);
   };
-  // Squish (Bun / Cat only). Each button has a spring that follows a press in steps (pressTarget): strike, rebound, then a slow sink
+  // Squish (Bun / Cat only). Each button has a spring that follows a press in steps (pressTarget): strike, rebound, then back to full size
   // while held. A release swings it back past
   // rest (down to about -0.4, a bouncy stretch) before it settles. A press the overlay skipped between two frames is latched
   // (latch), so a tap shorter than a frame still squashes. Springs step in real time, so mashing never leaves one stuck.
@@ -485,13 +485,14 @@
   let sqBusy = false, sqHeld = false, sqClock = 0; // sqHeld: a squish button is down, so the hold keeps animating between packets
   const sn = v => Math.round(v / P) * P; // snap to the pixel grid
   const sqp = n => (squishFx ? sq[n].p : 0); // a button's squish: 0 at rest, 1 pressed, below 0 stretched
-  // A held button runs a few steps, all keeping the pressed colour: it strikes down (1.4), rebounds (1.0), then sinks slowly
-  // deeper (up to 1.6) while it stays held. The spring adds a small overshoot at each step. Release swings back out (below).
+  // A held button runs a few steps, all keeping the pressed colour: it strikes down (1.4), rebounds (1.0), then eases back up to
+  // its full size (0) over the next half second. Held long enough it looks unsquished again, but stays in the pressed colour.
+  // Release swings back out (below).
   const pressTarget = (age) => {
     if (age < 140) return 1.4;
     if (age < 280) return 1.0;
-    if (age < 900) return 1.0 + 0.6 * (age - 280) / 620;
-    return 1.6;
+    if (age < 900) return 1 - (age - 280) / 620;
+    return 0;
   };
   function stepSquish(buttons) {
     const now = performance.now();
