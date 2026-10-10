@@ -43,7 +43,10 @@ typedef struct {
     uint8_t  r2;            // Right Trigger Analog Pressure (0 - 255)
     uint8_t  touch_active;  // 1 if touchpad finger is active, 0 otherwise
     uint8_t  reserved;      // Reserved for alignment / future expansion
+    float    accel[3];      // Accelerometer x, y, z, as the PS4 SDK reports it (1.0 = 1 g is assumed; check on a real pad)
+    float    gyro[3];       // Gyro x, y, z: angular velocity, as the PS4 SDK reports it. Zero when the pad sends no motion
 } PadPacket;
+// Packets from plugins older than the motion fields are 20 bytes; the bridge reads motion only when the packet is long enough.
 #pragma pack(pop)
 
 typedef struct {

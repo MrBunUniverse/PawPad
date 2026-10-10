@@ -12,12 +12,15 @@
 typedef struct stick { uint8_t x, y; } stick;
 typedef struct analog { uint8_t l2, r2; } analog;
 typedef struct OrbisPadTouchData { uint8_t fingers; } OrbisPadTouchData;
+typedef struct { float x, y, z; } vec_float3;
 typedef struct OrbisPadData {
     uint32_t buttons;
     stick leftStick;
     stick rightStick;
     analog analogButtons;
     OrbisPadTouchData touch;
+    vec_float3 vel;   // angular velocity (gyro)
+    vec_float3 acell; // acceleration
 } OrbisPadData;
 #endif
 
@@ -106,6 +109,8 @@ void pad_hook_start(const PadStreamConfig *config) {
             packet.r2 = data.analogButtons.r2;
             packet.touch_active = (data.touch.fingers > 0) ? 1 : 0;
             packet.reserved = 0;
+            memcpy(packet.accel, &data.acell, sizeof(packet.accel)); // both vec_float3: three floats each, no padding
+            memcpy(packet.gyro, &data.vel, sizeof(packet.gyro));
 
             udp_sender_send(&packet);
         }
