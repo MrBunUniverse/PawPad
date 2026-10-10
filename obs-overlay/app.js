@@ -64,6 +64,8 @@
   // The names shown on the coat buttons.
   const COAT_SETS = window.RetroPad.coats; // retro.js owns the list: each furry style's coats, the first being its default
   const COAT_NAME = { pumpkin: 'Pumpkin', shadow: 'Shadow', snowball: 'Snowball', smokey: 'Smokey', mittens: 'Mittens', redfox: 'Red', snowfox: 'Snow', silverfox: 'Silver', fennec: 'Fennec', golden: 'Golden', chocolate: 'Chocolate', husky: 'Husky', corgi: 'Corgi', greywolf: 'Grey', blackwolf: 'Black', whitewolf: 'White', timberwolf: 'Timber' };
+  let coatMemory = {};
+  try { coatMemory = JSON.parse(localStorage.getItem('padCoats')) || {}; } catch (e) { /* storage blocked or never saved */ }
   const coatStyleOf = (coat) => Object.keys(COAT_SETS).find((st) => COAT_SETS[st].includes(coat));
   coatInput.replaceChildren(...Object.values(COAT_SETS).flat().map((c) => new Option(COAT_NAME[c], c)));
   const segSelects = [...document.querySelectorAll('select[data-seg]')];
@@ -116,7 +118,12 @@
     const l = { ...snapshot(), ...patch };
     config.style = ['fine', 'bun', 'cat', 'fox', 'dog', 'wolf'].includes(l.style) ? l.style : 'classic';
     const coats = COAT_SETS[config.style] || COAT_SETS.cat;
-    config.coat = coats.includes(l.coat) ? l.coat : coats[0]; // a coat from another style (or none) falls back to this style's first
+    // A coat from another style falls back to the coat this style had last time (kept in this browser), else its first.
+    config.coat = coats.includes(l.coat) ? l.coat : coats.includes(coatMemory[config.style]) ? coatMemory[config.style] : coats[0];
+    if (COAT_SETS[config.style] && coatMemory[config.style] !== config.coat) {
+      coatMemory[config.style] = config.coat;
+      try { localStorage.setItem('padCoats', JSON.stringify(coatMemory)); } catch (e) { /* storage blocked */ }
+    }
     config.tone = l.tone === 'midnight' ? 'midnight' : 'default';
     config.layout = l.layout === 'wide' ? 'wide' : 'normal';
     config.pad = l.pad !== false && l.pad !== 'false' && l.pad !== '0';
@@ -149,6 +156,7 @@
     window.RetroPad.setStyle(config.style, config.coat, config.tone, config.layout, config.pad, ctrl, config.trigger, config.bulge, config.squish, config.names, { calm: config.calm, theme: config.theme, trail: config.trail });
     try { for (const k of LOOK_KEYS) localStorage.setItem(storeKey(k), config[k]); } catch (e) { /* storage blocked */ }
     if (!config.history) historyBox.hidden = true;
+    updateSummaries();
   }
 
   function setDeadzone(fraction) {
@@ -196,6 +204,17 @@
     stageTarget = target;
     stageCanvas.style.transition = 'opacity 0.6s ease';
     stageCanvas.style.opacity = target;
+  }
+
+  // A short line on each closed group says what is on inside it (the line hides while the group is open).
+  const sums = Object.fromEntries([...document.querySelectorAll('[data-sum]')].map((el) => [el.dataset.sum, el]));
+  const listOn = (pairs) => pairs.filter(([, on]) => on).map(([name]) => name).join(' · ') || 'all off';
+  function updateSummaries() {
+    sums.motion.textContent = listOn([['calm', config.calm], ['shake', config.shake], ['squeeze', config.trigger === 'squeeze'], ['squish', config.squish], ['trail', config.trail]]);
+    sums.show.textContent = listOn([['names', config.names], ['history', config.history], [`hide ${config.hideAfter}s`, config.autohide], ['wide', config.layout === 'wide']]);
+    sums.signal.textContent = `${{ auto: 'auto', ps4: 'PS4', local: 'this computer' }[config.source]}${simulatorToggle.checked ? ' · test' : ''}`;
+    const n = Object.keys(readPresets()).length;
+    sums.presets.textContent = n ? `${n} saved` : 'none saved';
   }
 
   // Settings groups: Look starts open, the rest closed. Which ones are open is remembered per browser, not sent to OBS.
@@ -280,7 +299,7 @@
   };
   simulatorToggle.addEventListener('change', () => {
     if (!simulatorToggle.checked) { mashToggle.checked = false; setMash(false); }
-    sendSim(); showStatus();
+    sendSim(); showStatus(); updateSummaries();
   });
 
   // Button mash (preview only): this page makes its own random presses at random moments, some only one frame long, so the
@@ -452,6 +471,7 @@
     const names = Object.keys(readPresets());
     presetSelect.replaceChildren(...(names.length ? names.map((n) => new Option(n, n)) : [new Option('(none saved)', '')]));
     if (selected && names.includes(selected)) presetSelect.value = selected;
+    updateSummaries();
   }
   $('savePresetBtn').addEventListener('click', (e) => {
     const name = presetName.value.trim();
