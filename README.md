@@ -85,13 +85,26 @@ In a web browser, go to **http://localhost:8080/** and open **Settings**. Your c
 | Setting | What it does |
 |---|---|
 | **Controller** | **Auto** picks the right controller for what you plug in. You can also choose **PlayStation** or **Xbox** |
-| **Style** | **Classic** (chunky pixels, the default). **Fine** (smoother and sharper). **Bun** (a cute bunny with ears that bounce when you press the touchpad). **Cat** (cat ears and paw-print sticks) |
+| **Style** | **Classic** (chunky pixels, the default). **Fine** (smoother and sharper). **Bun** (a cute bunny with ears that bounce when you press the touchpad, and fold down on the side of the bumper you press: L1 for the left ear, R1 for the right). **Cat** (cat ears that fold down with the bumper on their side, and paw-print sticks) |
 | **Colors** | For Fine: **Default**, or **Midnight** (dark) |
 | **Which cat** | For Cat: Pumpkin, Shadow, Snowball, Smokey or Mittens |
 | **Layout** | **Normal**, or **Wide** (one short row, handy when a game's HUD is in the way) |
 | **Touchpad** | Show or hide the touchpad (or the Guide button on the Xbox look) |
 | **Shadow** | A soft shadow behind the controller so it stands out on a busy game screen. Drag the slider to make it stronger; **Off** is the default |
 | **Frame rate** | How often the overlay redraws, 5 to 60 fps. Lower it to use less CPU, or for a choppy, stylised look. 60 is the default |
+| **Opacity** | How see-through the controller is, from 10% to 100%. Lower it to let the game show through. 100% is the default |
+| **Squeeze triggers** | **Off** (the default) shows L2 and R2 as a level meter with a 0-100 readout. **On** drops the meter and number: the button sinks and shrinks as you pull it |
+| **Trigger bulge** | With **Squeeze triggers** on, a pulled trigger also bulges out a little, like a squeezed ball. Bun and Cat only. On by default |
+| **Squish buttons** | Every button squishes and bulges a little when pressed. Bun and Cat only. Off by default |
+| **Theme** | Colour themes for the controller: Default, High contrast, Night or Pastel |
+| **Calm mode** | Stops all motion: no bounce, wobble, ear folds or trigger bulge. Shapes still change. Good for viewers who get overstimulated |
+| **Auto-hide when idle** | Fades the controller out after 8 seconds with no input, and brings it back on the next press |
+| **Input history** | Shows the last four buttons pressed, in the corner of the overlay |
+| **Stick trail** | Faint dots that trail each stick cap as it moves |
+| **Advanced settings** | Shows the rarer rows (shadow, frame rate, capture delay, stick deadzone, bulge and squish). Off by default; this browser remembers the choice |
+| **Presets, export and reset** | Save named looks, export and import a look as a JSON file, or reset everything to the defaults. **Copy look URL** makes a link that pins one OBS scene to one look |
+| **Signal** | Shows packets per second from the bridge, time since the last packet, and presses per second |
+| **Button names** | Names the triggers and bumpers: LT / RT and LB / RB on the Xbox look, L2 / R2 and L1 / R1 on the PlayStation look. Triggers show their name in Squeeze mode only, since the level meter fills their box. On by default |
 | **Source** | **Auto** (the PS4 when it's sending, otherwise your computer's controller), **PS4**, or **This computer** |
 
 The overlay stays **488 × 280** in every layout, so you never need to resize it.
@@ -120,6 +133,8 @@ Good to know:
 ## Test mode (no PS4 needed)
 
 Go to **http://localhost:8080/**, open **Settings**, and turn on **Test mode**. A fake controller shows on every page, **including OBS**, so you can place and size the overlay. Turn it off when you're done.
+
+**Button mash (preview)** sits under Test mode. It makes random button presses at random moments, some only a frame long, so you can watch the squish animation under busy input. It plays on the settings page only; turning it on also turns Test mode on.
 
 ## Troubleshooting
 

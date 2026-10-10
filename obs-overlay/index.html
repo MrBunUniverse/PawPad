@@ -6,8 +6,9 @@
   <title>PawPad</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="simple">
   <main class="stage"><canvas id="retroCanvas" width="122" height="70"></canvas></main>
+  <div id="history" class="history" hidden></div>
 
   <div id="connectionStatus" class="status"><i></i><span id="statusText">Connecting…</span></div>
   <button id="settingsToggleBtn" class="gear">Settings</button>
@@ -19,6 +20,10 @@
     </header>
 
     <div class="scroll">
+      <section>
+        <label class="switch" title="Shows the advanced settings: shadow, frame rate, capture delay, stick deadzone, and the stylised extras."><span>Advanced settings</span><input type="checkbox" id="advancedToggle"><b></b></label>
+      </section>
+
       <section>
         <h2>Look</h2>
         <div class="field">
@@ -37,10 +42,24 @@
           <span class="lbl">Which cat</span>
           <select id="coatInput" data-seg="swatch"><option value="pumpkin">Pumpkin</option><option value="shadow">Shadow</option><option value="snowball">Snowball</option><option value="smokey">Smokey</option><option value="mittens">Mittens</option></select>
         </div>
-        <label class="slider"><span>Shadow</span><output id="shadowVal">Off</output>
+        <div class="field">
+          <span class="lbl">Theme</span>
+          <select id="themeInput" data-seg><option value="default">Default</option><option value="contrast">High contrast</option><option value="night">Night</option><option value="pastel">Pastel</option></select>
+        </div>
+        <label class="slider adv"><span>Shadow</span><output id="shadowVal">Off</output>
           <input type="range" id="shadowInput" min="0" max="100" step="5" value="0"></label>
-        <label class="slider"><span>Frame rate</span><output id="fpsVal">60 fps</output>
+        <label class="slider adv"><span>Frame rate</span><output id="fpsVal">60 fps</output>
           <input type="range" id="fpsInput" min="5" max="60" step="5" value="60"></label>
+        <label class="slider"><span>Opacity</span><output id="opacityVal">100%</output>
+          <input type="range" id="opacityInput" min="10" max="100" step="5" value="100"></label>
+        <label class="switch" title="Calm mode: no bounce, wobble, ear folds or trigger bulge. Shapes still change, but nothing moves."><span>Calm mode</span><input type="checkbox" data-look="calm"><b></b></label>
+        <label class="switch" title="Fades the controller out after 8 seconds with no input. It comes back on the next press."><span>Auto-hide when idle</span><input type="checkbox" data-look="autohide"><b></b></label>
+        <label class="switch" title="Shows the last four buttons pressed, in the corner of the overlay."><span>Input history</span><input type="checkbox" data-look="history"><b></b></label>
+        <label class="switch" title="Faint dots that trail the stick cap as it moves."><span>Stick trail</span><input type="checkbox" data-look="trail"><b></b></label>
+        <label class="switch" title="Squeeze the triggers: each one shrinks as you pull it."><span>Squeeze triggers</span><input type="checkbox" id="squeezeToggle"><b></b></label>
+        <label class="switch adv" title="Bun and Cat: a squeezed trigger bulges out a little as you pull it."><span>Trigger bulge (Bun, Cat)</span><input type="checkbox" id="bulgeToggle" checked><b></b></label>
+        <label class="switch adv" title="Bun and Cat: every pressed button squashes and bulges, then bounces back."><span>Squish buttons (Bun, Cat)</span><input type="checkbox" id="squishToggle"><b></b></label>
+        <label class="switch" title="Names the triggers and bumpers: LT / RT and LB / RB, or L2 / R2 and L1 / R1."><span>Button names</span><input type="checkbox" id="namesToggle" checked><b></b></label>
       </section>
 
       <section>
@@ -58,16 +77,26 @@
           <span class="lbl">Source</span>
           <select id="sourceInput" data-seg><option value="auto">Auto</option><option value="ps4">PS4</option><option value="local">This computer</option></select>
         </div>
-        <label class="slider"><span>Capture delay</span><output id="delayVal">0 ms</output>
+        <label class="slider adv"><span>Capture delay</span><output id="delayVal">0 ms</output>
           <input type="range" id="delayInput" min="0" max="500" step="10" value="0"></label>
-        <label class="slider"><span>Stick deadzone</span><output id="deadzoneVal">6%</output>
+        <label class="slider adv"><span>Stick deadzone</span><output id="deadzoneVal">6%</output>
           <input type="range" id="deadzoneInput" min="0" max="30" step="1" value="6"></label>
-        <label class="switch"><span>Test mode</span><input type="checkbox" id="simulatorToggle"><b></b></label>
+        <label class="switch" title="Sends a fake controller to every page, OBS included, so you can place the overlay."><span>Test mode</span><input type="checkbox" id="simulatorToggle"><b></b></label>
+        <label class="switch" title="Random presses on this page only, to preview the squish. Turns Test mode on."><span>Button mash (preview)</span><input type="checkbox" id="mashToggle"><b></b></label>
+        <div class="field"><span class="lbl">Signal</span><code id="statLine" class="stat">no packets yet</code></div>
       </section>
 
       <section class="target">
         <h2>PS4 target</h2>
         <code id="detectedIp">127.0.0.1:9999</code>
+      </section>
+
+      <section class="presets">
+        <h2>Presets</h2>
+        <div class="row"><input type="text" id="presetName" maxlength="24" placeholder="Name this look"><button id="savePresetBtn" class="mini">Save</button></div>
+        <div class="row"><select id="presetSelect" class="mini-select"></select><button id="loadPresetBtn" class="mini">Load</button><button id="deletePresetBtn" class="mini">Delete</button></div>
+        <div class="row"><button id="exportBtn" class="mini">Export</button><button id="importBtn" class="mini">Import</button><input type="file" id="importFile" accept="application/json" hidden></div>
+        <div class="row"><button id="lookUrlBtn" class="mini">Copy look URL</button><button id="resetBtn" class="mini">Reset to defaults</button></div>
       </section>
     </div>
 

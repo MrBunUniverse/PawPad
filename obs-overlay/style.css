@@ -149,3 +149,29 @@ input[type=range]::-webkit-slider-thumb {
 body.hide-ui { background: transparent; }
 body.hide-ui .stage { padding: 0; }
 body.hide-ui .status, body.hide-ui .gear, body.hide-ui .panel { display: none; }
+
+/* Simple view (the default) hides the advanced rows; the Advanced settings switch shows them */
+body.simple .adv { display: none; }
+
+/* Presets: a row of small buttons and a name field */
+.row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.row input[type='text'] {
+  flex: 1; min-width: 0; padding: 6px 8px; background: var(--raise); color: var(--text); border: 0;
+  font: 12px var(--mono); user-select: text;
+}
+.mini, .mini-select {
+  padding: 6px 10px; background: var(--raise); color: var(--text); font: 11px var(--mono); border: 0;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.mini-select { flex: 1; min-width: 0; }
+.mini:hover { background: var(--accent); color: var(--ink); }
+.presets .row:last-child .mini { flex: 1; }
+
+/* Signal line in the settings panel */
+.stat { font: 11px/1.4 var(--mono); color: var(--dim); background: var(--raise); padding: 4px 8px; user-select: text; }
+
+/* Input history: the last few presses, bottom-left of the overlay */
+.history {
+  position: fixed; left: 10px; bottom: 6px; font: 10px/1.3 var(--mono); color: var(--text);
+  text-shadow: 0 1px 0 #000; pointer-events: none; letter-spacing: 0.06em;
+}
