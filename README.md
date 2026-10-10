@@ -4,7 +4,7 @@
 
 PawPad puts your controller on your stream as pixel-art buttons. Buttons light up when you press them, the sticks move, and L2/R2 show how far you're pulling them.
 
-![PawPad: your PS4 controller, but cute. Shown in the Classic, Bun and Cat looks.](docs/looks.png)
+![PawPad: your PS4 controller, but cute. Shown in the Classic, Bun, Cat, Fox, Dog and Wolf looks.](docs/looks.png)
 
 - **Pick a look:** Classic, Bun (a bunny with floppy ears), Cat, Fox, Dog or Wolf (each with its own set of colors to choose from).
 - **Xbox look too:** it works with Xbox-style controllers.
