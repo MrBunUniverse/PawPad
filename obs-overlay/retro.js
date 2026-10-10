@@ -482,7 +482,7 @@
   const SQ_PRESS = { w: 2 * Math.PI * 7, z: 0.55 }, SQ_RELEASE = { w: 2 * Math.PI * 4.5, z: 0.3 }; // stiffness (rad/s), damping ratio
   const SQ_HOLD = 80; // ms a latched press stays on
   const sq = Object.fromEntries(SQ_BUTTONS.map(n => [n, { p: 0, v: 0, until: 0, at: 0, held: false }]));
-  let sqBusy = false, sqHeld = false, sqClock = 0; // sqHeld: a squish button is down, so the hold keeps animating between packets
+  let sqBusy = false, sqHeld = false, sqClock = 0; // sqHeld: a squish button was pressed in the last 900 ms, so its hold steps keep animating between packets
   const sn = v => Math.round(v / P) * P; // snap to the pixel grid
   const sqp = n => (squishFx ? sq[n].p : 0); // a button's squish: 0 at rest, 1 pressed, below 0 stretched
   // A held button runs a few steps, all keeping the pressed colour: it strikes down (1.4), rebounds (1.0), then eases back up to
@@ -502,7 +502,7 @@
     sqBusy = false; sqHeld = false;
     for (const n of SQ_BUTTONS) {
       const s = sq[n], held = !!(buttons[n] || now < s.until);
-      if (held) sqHeld = true;
+      if (held && now - s.at < 900) sqHeld = true; // after the hold steps end (900 ms) the button sits still, so no redraw is needed
       if (held && !s.held) s.at = now; // press onset: the held steps start here
       s.held = held;
       const target = held ? pressTarget(now - s.at) : 0, k = held ? SQ_PRESS : SQ_RELEASE;
@@ -747,6 +747,7 @@
 
   // Called once per overlay frame (app.js), so a squish keeps moving when no new pad state arrives.
   function tick() { if (squishFx && (sqBusy || sqHeld)) draw(...last); }
-  window.RetroPad = { draw, setStyle, latch, tick, shake };
+  // coats: each furry style's coat names (the first is the default). squish(name): that button's current squish, for tests.
+  window.RetroPad = { draw, setStyle, latch, tick, shake, coats: SPECIES, squish: n => sq[n].p };
   setStyle('classic');
 })();

@@ -61,11 +61,8 @@
     golden: '#d9a24a', chocolate: '#7a4a2e', husky: '#9aa5b5', corgi: '#e0903c',
     greywolf: '#6c7a8e', blackwolf: '#2e3140', whitewolf: '#e3e9f1', timberwolf: '#8a6d4f'
   };
-  // The furries that pick a coat: each style's coats (the first is its default) and the name shown above them.
-  const COAT_SETS = {
-    cat: ['pumpkin', 'shadow', 'snowball', 'smokey', 'mittens'], fox: ['redfox', 'snowfox', 'silverfox', 'fennec'],
-    dog: ['golden', 'chocolate', 'husky', 'corgi'], wolf: ['greywolf', 'blackwolf', 'whitewolf', 'timberwolf']
-  };
+  // The names shown on the coat buttons.
+  const COAT_SETS = window.RetroPad.coats; // retro.js owns the list: each furry style's coats, the first being its default
   const COAT_NAME = { pumpkin: 'Pumpkin', shadow: 'Shadow', snowball: 'Snowball', smokey: 'Smokey', mittens: 'Mittens', redfox: 'Red', snowfox: 'Snow', silverfox: 'Silver', fennec: 'Fennec', golden: 'Golden', chocolate: 'Chocolate', husky: 'Husky', corgi: 'Corgi', greywolf: 'Grey', blackwolf: 'Black', whitewolf: 'White', timberwolf: 'Timber' };
   const coatStyleOf = (coat) => Object.keys(COAT_SETS).find((st) => COAT_SETS[st].includes(coat));
   coatInput.replaceChildren(...Object.values(COAT_SETS).flat().map((c) => new Option(COAT_NAME[c], c)));
