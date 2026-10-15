@@ -20,7 +20,7 @@
   "author": "Mr Bun",
   "license": "MIT",
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.22.0"
   },
   "optionalDependencies": {
     "@kmamal/sdl": "^0.11.13"
